@@ -16,7 +16,7 @@ header{display:flex;align-items:center;justify-content:space-between}
 #bar{height:100%;width:100%;background:#50d5bd}
 h1{font-size:clamp(23px,4.8vw,34px);line-height:1.08;margin:7px 0}
 h2{font-size:19px;margin:7px 0}
-p{line-height:1.3;margin:7px 0;font-size:14px}
+p{line-height:1.4;margin:7px 0;font-size:14px}
 .muted{color:#bfd0e0}
 .tag{color:#50d5bd;font-size:12px;font-weight:bold;letter-spacing:1px}
 .panel{background:#152a43;border:1px solid #34516a;border-radius:14px;padding:12px;margin:10px 0}
@@ -33,6 +33,7 @@ button span{font-size:12px;color:#d1dfeb}
 .center{text-align:center}
 .good{color:#50d5bd}
 .bad{color:#ff7885}
+.warning{color:#f7d78b}
 #feedback{color:#f7d78b;font-weight:bold}
 #question{font-size:17px;margin:2px 0 8px}
 #feedback:empty{display:none}
@@ -41,7 +42,7 @@ button span{font-size:12px;color:#d1dfeb}
 #ending h1{font-size:clamp(25px,6vw,38px)}
 .challenge{border-color:#50d5bd}
 #challengeResult{font-weight:bold;font-size:16px}
-#shareStatus{color:#50d5bd;font-size:13px;min-height:17px}
+#shareStatus,#reportStatus{color:#50d5bd;font-size:13px;min-height:17px}
 .shareTitle{margin:12px 0 6px;color:#50d5bd}
 .shareGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
 .shareGrid button{text-align:center;font-size:12px;padding:10px 3px;margin:0}
@@ -54,6 +55,13 @@ button span{font-size:12px;color:#d1dfeb}
 .companyBadge{color:#50d5bd;font-size:13px;font-weight:bold;margin:6px 0}
 .smallButton{font-size:12px;text-align:center;padding:8px}
 #nameError{color:#ff7885;font-size:13px}
+.reportGrid{display:grid;grid-template-columns:repeat(2,1fr);gap:9px;margin:12px 0}
+.reportBox{background:#0e2035;padding:12px;border-radius:10px}
+.reportBox h3{font-size:12px;color:#bfd0e0;margin:0 0 8px}
+.reportBox .big{font-size:clamp(18px,4vw,26px);font-weight:bold}
+.reportBox p{font-size:12px}
+.reportSummary{background:#0e2035;border-radius:10px;padding:12px;margin:10px 0}
+.reportSummary p{margin:8px 0}
 @media(max-height:740px){
 main{padding-top:7px}.track{margin:6px 0 8px}.panel{padding:9px;margin:7px 0}
 h1{font-size:clamp(21px,4vw,28px)}p{font-size:13px;margin:5px 0}
@@ -68,6 +76,7 @@ button span{font-size:11px}.shareGrid{grid-template-columns:repeat(4,1fr)}
 </head>
 <body>
 <main>
+
 <header>
 <div class="logo">VECORIQ</div>
 <div class="timer" id="timer">60s</div>
@@ -113,10 +122,48 @@ ACCEPT CHALLENGE - SAVE COMPANY
 </button>
 <button onclick="playFresh()">PLAY MY OWN COMPANY INSTEAD</button>
 <p class="notice">
-This is a rescue challenge. You do not need to create
+This is a rescue simulation. You do not need to create
 a company, and your own company is not affected.
 The original company's saved data is not changed.
 </p>
+</section>
+
+<section id="rescueReport" class="panel challenge hidden">
+<div class="tag">VECORIQ - COMPANY RESCUE REPORT</div>
+<h1 id="reportHeading">COMPANY RESCUE REPORT</h1>
+<h2 id="reportCompany" class="good"></h2>
+<p id="reportVerdict"></p>
+
+<div class="reportGrid">
+<div class="reportBox">
+<h3>BEFORE RESCUE</h3>
+<div id="reportBeforeCash" class="big bad"></div>
+<p id="reportBeforeStatus"></p>
+<p id="reportBeforeDetails"></p>
+</div>
+<div class="reportBox">
+<h3>AFTER RESCUE</h3>
+<div id="reportAfterCash" class="big"></div>
+<p id="reportAfterStatus"></p>
+<p id="reportAfterDetails"></p>
+</div>
+</div>
+
+<div class="reportSummary">
+<p id="reportImprovement"></p>
+<p id="reportOwnership"></p>
+<p id="reportMarket"></p>
+</div>
+
+<p class="notice">
+This report is a shared simulation result, not a verified
+server record. It does not automatically update the
+original company, transfer shares, or prove who played.
+</p>
+
+<button class="primary" onclick="playFresh()">
+PLAY VECORIQ - FREE
+</button>
 </section>
 
 <section id="game" class="hidden">
@@ -128,6 +175,7 @@ Your largest customer is gone. The bank wants its money.
 Your employees expect salaries.
 </p>
 <div id="ownershipNotice"></div>
+
 <div class="metrics">
 <div class="metric">
 <div class="label">CASH</div>
@@ -142,6 +190,7 @@ Your employees expect salaries.
 <div class="number" id="customers">60</div>
 </div>
 </div>
+
 <div class="panel">
 <h2 id="question">WHAT WILL YOU DO?</h2>
 <div id="choices"></div>
@@ -159,10 +208,21 @@ Your employees expect salaries.
 <p id="resultHoldings"></p>
 <p id="challengeResult"></p>
 
-<button id="retryChallengeButton"
- class="primary hidden" onclick="retryChallenge()">
+<div id="rescueActions" class="hidden">
+<button class="primary" onclick="copyRescueReport()">
+SEND RESCUE RESULT TO OWNER
+</button>
+<p class="notice">
+Copies a report link. Send it to the company owner
+through WhatsApp, email, or another app.
+</p>
+<p id="reportStatus" role="status" aria-live="polite"></p>
+<input id="reportLink" class="shareLink" readonly
+ aria-label="Rescue report link" onclick="this.select()">
+<button class="primary" onclick="retryChallenge()">
 RETRY COMPANY RESCUE
 </button>
+</div>
 
 <button class="primary" onclick="playFresh()">
 PLAY MY OWN COMPANY
@@ -180,6 +240,7 @@ COPY CHALLENGE LINK
 </button>
 <input id="shareLink" class="shareLink" readonly
  aria-label="Challenge link" onclick="this.select()">
+
 <div class="shareGrid">
 <button onclick="sharePlatform('whatsapp')">
 <strong>✆</strong><span>WhatsApp</span>
@@ -208,6 +269,7 @@ COPY CHALLENGE LINK
 </div>
 <p id="shareStatus" role="status" aria-live="polite"></p>
 </section>
+
 </main>
 
 <script>
@@ -215,6 +277,7 @@ const fmt=n=>"$"+Math.round(n).toLocaleString("en-US");
 const ledgerKey="vecoriq_time_penalties_v1";
 const companyKey="vecoriq_company_name_v1";
 const challengeVersion=1;
+const reportVersion=1;
 
 let state,step,seconds,interval,active,shock,events,penalized;
 let cumulativePenalties=readPenalties();
@@ -226,6 +289,7 @@ let finalOutcome=null;
 function el(id){
  return document.getElementById(id);
 }
+
 function readPenalties(){
  try{
   const n=Number(localStorage.getItem(ledgerKey));
@@ -233,29 +297,35 @@ function readPenalties(){
    Math.max(0,Math.min(100,Math.round(n*10)/10)):0;
  }catch(e){return 0;}
 }
+
 function savePenalties(){
  try{
   localStorage.setItem(ledgerKey,String(cumulativePenalties));
  }catch(e){}
 }
+
 function cleanCompanyName(name){
  return String(name||"")
   .replace(/[\u0000-\u001F\u007F]/g,"")
   .trim().replace(/\s+/g," ").slice(0,40);
 }
+
 function readCompanyName(){
  try{
   return cleanCompanyName(localStorage.getItem(companyKey)||"");
  }catch(e){return "";}
 }
+
 function storeCompanyName(name){
  try{
   localStorage.setItem(companyKey,name);
  }catch(e){}
 }
+
 function pct(n){
  return Number(n).toFixed(1)+"%";
 }
+
 function effectiveCompanyName(){
  if(currentChallenge){
   return currentChallenge.companyName||"FRIEND'S COMPANY";
@@ -269,6 +339,7 @@ function showCompanyIntro(){
  el("game").classList.add("hidden");
  el("ending").classList.add("hidden");
  el("challengeIntro").classList.add("hidden");
+ el("rescueReport").classList.add("hidden");
  el("companyIntro").classList.remove("hidden");
  el("companyNameInput").value=companyName;
  el("nameError").textContent="";
@@ -277,27 +348,32 @@ function showCompanyIntro(){
  el("timeNotice").textContent="";
  el("companyNameInput").focus();
 }
+
 function saveCompanyAndStart(){
  const input=el("companyNameInput");
  const name=cleanCompanyName(input.value);
+
  if(!name){
   el("nameError").textContent=
    "Please enter a company name.";
   input.focus();
   return;
  }
+
  companyName=name;
  storeCompanyName(name);
  el("companyIntro").classList.add("hidden");
  startGame();
 }
+
 el("companyNameInput").addEventListener("keydown",function(e){
  if(e.key==="Enter")saveCompanyAndStart();
 });
+
 function renameCompany(){
  incomingChallenge=null;
  currentChallenge=null;
- clearChallengeURL();
+ clearSpecialURL();
  showCompanyIntro();
 }
 
@@ -312,6 +388,7 @@ function updateOwnership(){
    " · Recoverable via future verified referrals";
  }
 }
+
 function applyTimePenalty(){
  if(penalized)return;
  penalized=true;
@@ -326,13 +403,17 @@ function applyTimePenalty(){
  const amount=Math.min(
   0.1,Math.max(0,100-cumulativePenalties)
  );
+
  cumulativePenalties=
   Math.round((cumulativePenalties+amount)*10)/10;
+
  state.ownership=Math.max(
   0,Math.round((state.ownership-amount)*10)/10
  );
+
  savePenalties();
  updateOwnership();
+
  events.push(
   "Decision deadline exceeded: "+pct(amount)+
   " transferred to VECORIQ Holdings."
@@ -347,7 +428,8 @@ function challengeScore(outcome){
   Math.round(outcome.debt*0.25)
  );
 }
-function encodeChallenge(data){
+
+function encodeData(data){
  const json=JSON.stringify(data);
  const bytes=new TextEncoder().encode(json);
  let binary="";
@@ -357,45 +439,83 @@ function encodeChallenge(data){
   .replace(/\//g,"_")
   .replace(/=+$/,"");
 }
-function decodeChallenge(encoded){
+
+function decodeData(encoded,maxLength=4000){
  try{
-  if(!encoded||encoded.length>2000)return null;
+  if(!encoded||encoded.length>maxLength)return null;
   const base64=encoded.replace(/-/g,"+").replace(/_/g,"/");
   const binary=atob(base64);
   const bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));
-  const data=JSON.parse(new TextDecoder().decode(bytes));
-
-  if(!data||data.v!==challengeVersion)return null;
-  if(data.market!=="boom"&&data.market!=="recession")return null;
-  if(!Number.isFinite(data.cash)||
-     !Number.isFinite(data.debt)||
-     !Number.isFinite(data.customers)||
-     typeof data.failed!=="boolean")return null;
-
-  if(Math.abs(data.cash)>100000000||
-     data.debt<0||data.debt>100000000||
-     data.customers<0||data.customers>1000000)return null;
-
-  if(typeof data.companyName!=="undefined"&&
-     typeof data.companyName!=="string")return null;
-
-  data.companyName=cleanCompanyName(data.companyName||"");
-  return data;
+  return JSON.parse(new TextDecoder().decode(bytes));
  }catch(e){
   return null;
  }
 }
+
+function validOutcome(data){
+ return !!data &&
+  (data.market==="boom"||data.market==="recession") &&
+  Number.isFinite(data.cash) &&
+  Number.isFinite(data.debt) &&
+  Number.isFinite(data.customers) &&
+  typeof data.failed==="boolean" &&
+  Math.abs(data.cash)<=100000000 &&
+  data.debt>=0 &&
+  data.debt<=100000000 &&
+  data.customers>=0 &&
+  data.customers<=1000000 &&
+  (typeof data.companyName==="undefined"||
+   typeof data.companyName==="string");
+}
+
+function decodeChallenge(encoded){
+ const data=decodeData(encoded,2000);
+ if(!data||data.v!==challengeVersion||
+    !validOutcome(data))return null;
+
+ data.companyName=cleanCompanyName(data.companyName||"");
+ return data;
+}
+
+function decodeReport(encoded){
+ const data=decodeData(encoded,4000);
+
+ if(!data||data.v!==reportVersion||
+    !validOutcome(data.before)||
+    !validOutcome(data.after))return null;
+
+ if(data.before.market!==data.after.market)return null;
+
+ if(!Number.isFinite(data.ownership)||
+    data.ownership<0||data.ownership>100)return null;
+
+ data.before.companyName=
+  cleanCompanyName(data.before.companyName||"");
+ data.after.companyName=
+  cleanCompanyName(data.after.companyName||"");
+
+ return data;
+}
+
 function readIncomingChallenge(){
  const params=new URLSearchParams(location.search);
  return decodeChallenge(params.get("challenge"));
 }
-function clearChallengeURL(){
+
+function readIncomingReport(){
+ const params=new URLSearchParams(location.search);
+ return decodeReport(params.get("report"));
+}
+
+function clearSpecialURL(){
  const url=new URL(location.href);
  url.searchParams.delete("challenge");
+ url.searchParams.delete("report");
  history.replaceState(
   null,"",url.pathname+url.search+url.hash
  );
 }
+
 function showChallengeIntro(data){
  incomingChallenge=data;
  clearInterval(interval);
@@ -404,6 +524,7 @@ function showChallengeIntro(data){
  el("game").classList.add("hidden");
  el("ending").classList.add("hidden");
  el("companyIntro").classList.add("hidden");
+ el("rescueReport").classList.add("hidden");
  el("challengeIntro").classList.remove("hidden");
 
  el("timer").textContent="60s";
@@ -419,6 +540,7 @@ function showChallengeIntro(data){
   "COMPANY TO SAVE: "+targetName;
 
  const status=data.failed?"COLLAPSED":"SURVIVED";
+
  el("challengeTarget").textContent=
   "YOUR TARGET: "+status+
   " · Cash: "+fmt(data.cash)+
@@ -427,26 +549,24 @@ function showChallengeIntro(data){
   " · Market: "+
   (data.market==="boom"?"BOOM":"RECESSION");
 }
+
 function beginChallenge(){
  if(!incomingChallenge)return;
-
- const data=incomingChallenge;
- el("challengeIntro").classList.add("hidden");
-
- // A rescue uses the friend's company name.
- // It never creates or renames the local player's company.
- startGame(data);
+ startGame(incomingChallenge);
 }
+
 function retryChallenge(){
  if(!currentChallenge)return;
  startGame(currentChallenge);
 }
+
 function playFresh(){
  incomingChallenge=null;
  currentChallenge=null;
- clearChallengeURL();
+ clearSpecialURL();
 
  el("challengeIntro").classList.add("hidden");
+ el("rescueReport").classList.add("hidden");
 
  if(!companyName){
   showCompanyIntro();
@@ -487,8 +607,11 @@ function startGame(challenge=null){
  el("ending").classList.add("hidden");
  el("challengeIntro").classList.add("hidden");
  el("companyIntro").classList.add("hidden");
+ el("rescueReport").classList.add("hidden");
+
  el("timeNotice").textContent="";
  el("shareStatus").textContent="";
+ el("reportStatus").textContent="";
 
  update();
  updateOwnership();
@@ -517,10 +640,12 @@ function startGame(challenge=null){
     el("timeNotice").textContent=
      "Deadline exceeded: 0.1% of your company transferred to VECORIQ Holdings. You may finish your decisions without further time penalties.";
    }
+
    tick();
   }
  },1000);
 }
+
 function tick(){
  el("timer").textContent=
   seconds>60?(seconds-60)+"s":seconds+"s";
@@ -532,6 +657,7 @@ function tick(){
   seconds>60?"#a52c40":
   seconds>0?"#8d5b21":"#59657a";
 }
+
 function update(){
  el("cash").textContent=fmt(state.cash);
  el("debt").textContent=fmt(state.debt);
@@ -725,6 +851,30 @@ function choose(action){
  }
 }
 
+function rescueVerdict(before,after){
+ const yourScore=challengeScore(after);
+ const targetScore=challengeScore(before);
+
+ if(yourScore===targetScore){
+  return "IT'S A TIE! You matched the original result.";
+ }
+
+ if(before.failed&&!after.failed){
+  return "COMPANY SAVED! YOU RESCUED "+
+   (before.companyName||"THE COMPANY")+"!";
+ }
+
+ if(before.failed&&after.failed&&yourScore>targetScore){
+  return "RESULT IMPROVED - COMPANY STILL COLLAPSED!";
+ }
+
+ if(yourScore>targetScore){
+  return "CHALLENGE WON! YOU IMPROVED THE COMPANY'S RESULT!";
+ }
+
+ return "CHALLENGE LOST! The original result was better.";
+}
+
 function finish(reason){
  if(!active)return;
 
@@ -801,30 +951,34 @@ function finish(reason){
  comparison.textContent="";
  comparison.className="";
 
- el("retryChallengeButton").classList.toggle(
+ el("rescueActions").classList.toggle(
   "hidden",!currentChallenge
  );
+
  el("renameButton").classList.toggle(
   "hidden",!!currentChallenge
  );
 
  if(currentChallenge){
-  const yourScore=challengeScore(finalOutcome);
-  const targetScore=challengeScore(currentChallenge);
+  comparison.textContent=
+   rescueVerdict(currentChallenge,finalOutcome);
 
-  if(yourScore>targetScore){
-   comparison.textContent=
-    "CHALLENGE WON! YOU IMPROVED "+
-    playedCompany+"'S RESULT!";
+  if(!finalOutcome.failed&&currentChallenge.failed){
    comparison.className="good";
-  }else if(yourScore===targetScore){
-   comparison.textContent=
-    "IT'S A TIE! You matched your friend's result.";
-  }else{
-   comparison.textContent=
-    "CHALLENGE LOST! Your friend scored higher. Try again!";
+  }else if(challengeScore(finalOutcome)>
+           challengeScore(currentChallenge)&&
+           !finalOutcome.failed){
+   comparison.className="good";
+  }else if(challengeScore(finalOutcome)<
+           challengeScore(currentChallenge)){
    comparison.className="bad";
+  }else if(finalOutcome.failed&&
+           challengeScore(finalOutcome)>
+           challengeScore(currentChallenge)){
+   comparison.className="warning";
   }
+
+  el("reportLink").value=getRescueReportLink();
  }
 
  el("shareLink").value=getChallengeLink();
@@ -846,10 +1000,95 @@ function getChallengeLink(){
  const url=new URL(location.href);
  url.searchParams.delete("version");
  url.searchParams.delete("utm_source");
+ url.searchParams.delete("report");
  url.searchParams.set(
-  "challenge",encodeChallenge(payload)
+  "challenge",encodeData(payload)
  );
+
  return url.toString();
+}
+
+function getRescueReportLink(){
+ if(!currentChallenge||!finalOutcome)return "";
+
+ const payload={
+  v:reportVersion,
+  before:{
+   market:currentChallenge.market,
+   cash:currentChallenge.cash,
+   debt:currentChallenge.debt,
+   customers:currentChallenge.customers,
+   failed:currentChallenge.failed,
+   companyName:effectiveCompanyName()
+  },
+  after:finalOutcome,
+  ownership:Math.max(0,Math.min(100,state.ownership))
+ };
+
+ const url=new URL(location.href);
+ url.searchParams.delete("version");
+ url.searchParams.delete("challenge");
+ url.searchParams.delete("utm_source");
+ url.searchParams.set("report",encodeData(payload));
+
+ return url.toString();
+}
+
+function showRescueReport(data){
+ clearInterval(interval);
+ active=false;
+
+ el("game").classList.add("hidden");
+ el("ending").classList.add("hidden");
+ el("challengeIntro").classList.add("hidden");
+ el("companyIntro").classList.add("hidden");
+ el("rescueReport").classList.remove("hidden");
+
+ el("timer").textContent="60s";
+ el("bar").style.width="100%";
+ el("timeNotice").textContent="";
+
+ const before=data.before;
+ const after=data.after;
+ const name=before.companyName||"FRIEND'S COMPANY";
+
+ el("reportHeading").textContent="COMPANY RESCUE REPORT";
+ el("reportCompany").textContent=name;
+ el("reportVerdict").textContent=
+  rescueVerdict(before,after);
+
+ el("reportBeforeCash").textContent=fmt(before.cash);
+ el("reportBeforeStatus").textContent=
+  before.failed?"COLLAPSED":"SURVIVED";
+ el("reportBeforeDetails").textContent=
+  "Debt: "+fmt(before.debt)+
+  " · Customers: "+before.customers;
+
+ el("reportAfterCash").textContent=fmt(after.cash);
+ el("reportAfterCash").className=
+  "big "+(after.failed?"bad":"good");
+
+ el("reportAfterStatus").textContent=
+  after.failed?"COLLAPSED":"SURVIVED";
+
+ el("reportAfterDetails").textContent=
+  "Debt: "+fmt(after.debt)+
+  " · Customers: "+after.customers;
+
+ const difference=after.cash-before.cash;
+
+ el("reportImprovement").textContent=
+  "Cash change: "+
+  (difference>=0?"+":"-")+
+  fmt(Math.abs(difference));
+
+ el("reportOwnership").textContent=
+  "Ownership after rescue simulation: "+
+  pct(data.ownership);
+
+ el("reportMarket").textContent=
+  "Market conditions: "+
+  (before.market==="boom"?"BOOM":"RECESSION");
 }
 
 function getShareMessage(){
@@ -868,39 +1107,50 @@ function getShareMessage(){
 function setShareStatus(message){
  el("shareStatus").textContent=message;
 }
-function selectChallengeLink(){
- const field=el("shareLink");
+
+function selectLink(fieldId){
+ const field=el(fieldId);
  field.focus();
  field.select();
  field.setSelectionRange(0,field.value.length);
 }
 
-async function copyChallengeLink(){
- const link=getChallengeLink();
- if(!link)return;
-
+async function copyText(text,fieldId,statusId){
  try{
   if(!navigator.clipboard||
      !navigator.clipboard.writeText){
    throw new Error("Clipboard API unavailable");
   }
 
-  await navigator.clipboard.writeText(link);
-  setShareStatus(
-   "CHALLENGE LINK COPIED! Paste it anywhere."
-  );
+  await navigator.clipboard.writeText(text);
+  el(statusId).textContent=
+   "LINK COPIED! Send it to your friend.";
  }catch(e){
-  selectChallengeLink();
-  setShareStatus(
-   "Link selected. Press Ctrl+C, then paste it anywhere."
-  );
+  selectLink(fieldId);
+  el(statusId).textContent=
+   "Link selected. Press Ctrl+C to copy it.";
  }
+}
+
+async function copyChallengeLink(){
+ const link=getChallengeLink();
+ if(!link)return;
+
+ await copyText(link,"shareLink","shareStatus");
+}
+
+async function copyRescueReport(){
+ const link=getRescueReportLink();
+ if(!link)return;
+
+ await copyText(link,"reportLink","reportStatus");
 }
 
 function openShareURL(url){
  const win=window.open(
   url,"_blank","noopener,noreferrer"
  );
+
  if(!win){
   setShareStatus(
    "Popup blocked. Use COPY CHALLENGE LINK instead."
@@ -999,14 +1249,20 @@ async function sharePlatform(platform){
  }
 }
 
-incomingChallenge=readIncomingChallenge();
+const incomingReport=readIncomingReport();
 
-if(incomingChallenge){
- showChallengeIntro(incomingChallenge);
-}else if(!companyName){
- showCompanyIntro();
+if(incomingReport){
+ showRescueReport(incomingReport);
 }else{
- startGame();
+ incomingChallenge=readIncomingChallenge();
+
+ if(incomingChallenge){
+  showChallengeIntro(incomingChallenge);
+ }else if(!companyName){
+  showCompanyIntro();
+ }else{
+  startGame();
+ }
 }
 </script>
 </body>
