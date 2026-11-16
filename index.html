@@ -3,11 +3,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>VECORIQ - The Virtual Economy</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#081525;color:#fff;font-family:Arial,sans-serif}
+body{margin:0;background:#081525;color:white;font-family:Arial,sans-serif}
 main{max-width:740px;margin:auto;padding:12px 16px}
 header{display:flex;align-items:center;justify-content:space-between}
 .logo{color:#50d5bd;font-size:25px;font-weight:900;letter-spacing:2px}
@@ -15,6 +15,7 @@ header{display:flex;align-items:center;justify-content:space-between}
 .track{height:6px;background:#30435a;border-radius:8px;margin:9px 0 12px;overflow:hidden}
 #bar{height:100%;width:100%;background:#50d5bd}
 h1{font-size:clamp(23px,4.8vw,34px);line-height:1.08;margin:7px 0}
+h2{font-size:19px;margin:7px 0}
 p{line-height:1.3;margin:7px 0;font-size:14px}
 .muted{color:#bfd0e0}
 .tag{color:#50d5bd;font-size:12px;font-weight:bold;letter-spacing:1px}
@@ -39,10 +40,14 @@ button span{font-size:12px;color:#d1dfeb}
 #ownershipNotice{font-size:12px;color:#b7cbdc;margin:6px 0}
 #ending h1{font-size:clamp(25px,6vw,38px)}
 .challenge{border-color:#50d5bd}
-.challenge p{font-size:13px}
-.challenge strong{color:#50d5bd}
 #challengeResult{font-weight:bold;font-size:16px}
-#shareStatus{color:#50d5bd;font-size:13px}
+#shareStatus{color:#50d5bd;font-size:13px;min-height:17px}
+.shareTitle{margin:12px 0 6px;color:#50d5bd}
+.shareGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:7px}
+.shareGrid button{text-align:center;font-size:12px;padding:10px 3px;margin:0}
+.shareGrid button strong{font-size:18px;margin-bottom:5px}
+.shareGrid button span{font-size:11px;color:#fff}
+.shareLink{width:100%;padding:10px;background:#0e2035;color:#d8e9f5;border:1px solid #476984;border-radius:8px;font-size:12px;overflow:hidden;text-overflow:ellipsis}
 @media(max-height:740px){
 main{padding-top:7px}
 .track{margin:6px 0 8px}
@@ -60,6 +65,7 @@ main{padding:9px}
 .panel{padding:10px}
 button{font-size:13px}
 button span{font-size:11px}
+.shareGrid{grid-template-columns:repeat(4,1fr)}
 }
 </style>
 </head>
@@ -84,10 +90,7 @@ button span{font-size:11px}
 <section id="game">
 <div class="tag" id="stage">EMERGENCY · 1/3</div>
 <h1 id="headline">YOUR COMPANY HAS 60 SECONDS TO SURVIVE!</h1>
-<p class="muted" id="story">
-Your largest customer is gone. The bank wants its money.
-Your employees expect salaries.
-</p>
+<p class="muted" id="story">Your largest customer is gone. The bank wants its money. Your employees expect salaries.</p>
 <div id="ownershipNotice"></div>
 <div class="metrics">
 <div class="metric">
@@ -118,9 +121,48 @@ Your employees expect salaries.
 <p id="resultDetails"></p>
 <p id="resultHoldings"></p>
 <p id="challengeResult"></p>
+
 <button class="primary" onclick="playFresh()">PLAY AGAIN</button>
-<button onclick="shareChallenge()" id="shareButton">CHALLENGE A FRIEND</button>
-<p id="shareStatus" role="status"></p>
+
+<h2 class="shareTitle">SAVE MY COMPANY - SHARE CHALLENGE</h2>
+<p>Invite friends to beat your result!</p>
+
+<button class="primary" onclick="copyChallengeLink()">
+COPY CHALLENGE LINK
+</button>
+
+<input id="shareLink" class="shareLink" readonly
+aria-label="Challenge link"
+onclick="this.select()">
+
+<div class="shareGrid">
+<button onclick="sharePlatform('whatsapp')">
+<strong>✆</strong><span>WhatsApp</span>
+</button>
+<button onclick="sharePlatform('telegram')">
+<strong>➤</strong><span>Telegram</span>
+</button>
+<button onclick="sharePlatform('messenger')">
+<strong>✉</strong><span>Messenger</span>
+</button>
+<button onclick="sharePlatform('facebook')">
+<strong>f</strong><span>Facebook</span>
+</button>
+<button onclick="sharePlatform('linkedin')">
+<strong>in</strong><span>LinkedIn</span>
+</button>
+<button onclick="sharePlatform('x')">
+<strong>𝕏</strong><span>X</span>
+</button>
+<button onclick="sharePlatform('email')">
+<strong>@</strong><span>Email</span>
+</button>
+<button onclick="sharePlatform('more')">
+<strong>⋯</strong><span>More</span>
+</button>
+</div>
+
+<p id="shareStatus" role="status" aria-live="polite"></p>
 </section>
 </main>
 
@@ -155,9 +197,9 @@ function pct(n){
 
 function updateOwnership(){
  document.getElementById("ownershipNotice").textContent=
- "Time-penalty shares held by VECORIQ Holdings: "+
- pct(cumulativePenalties)+
- " · Recoverable via future verified referrals";
+  "Time-penalty shares held by VECORIQ Holdings: "+
+  pct(cumulativePenalties)+
+  " · Recoverable via future verified referrals";
 }
 
 function applyTimePenalty(){
@@ -188,8 +230,6 @@ function applyTimePenalty(){
 }
 
 function challengeScore(outcome){
- // Score emphasizes company survival, then cash, customers and debt.
- // The original result is embedded in the URL for comparison.
  return (
   (outcome.failed?0:1000000)+
   Math.round(outcome.cash)+
@@ -247,6 +287,7 @@ function clearChallengeURL(){
 
 function showChallengeIntro(data){
  incomingChallenge=data;
+
  document.getElementById("game").classList.add("hidden");
  document.getElementById("ending").classList.add("hidden");
  document.getElementById("challengeIntro").classList.remove("hidden");
@@ -255,6 +296,7 @@ function showChallengeIntro(data){
  document.getElementById("timeNotice").textContent="";
 
  const status=data.failed?"COLLAPSED":"SURVIVED";
+
  document.getElementById("challengeTarget").textContent=
   "YOUR TARGET: "+status+
   " · Cash: "+fmt(data.cash)+
@@ -327,8 +369,10 @@ function startGame(challenge=null){
    seconds=0;
    applyTimePenalty();
    clearInterval(interval);
+
    document.getElementById("timeNotice").textContent=
     "Deadline exceeded: 0.1% of your company transferred to VECORIQ Holdings. You may finish your decisions without further time penalties.";
+
    tick();
   }
  },1000);
@@ -393,8 +437,10 @@ function getRound(){
 
 function render(){
  const r=getRound();
+
  document.getElementById("stage").textContent=
   "CRISIS · DECISION "+(step+1)+"/3";
+
  document.getElementById("headline").textContent=r.headline;
  document.getElementById("story").textContent=r.story;
  document.getElementById("question").textContent=r.question;
@@ -595,14 +641,11 @@ function finish(reason){
   }
  }
 
- document.getElementById("shareButton").textContent=
-  failed?
-  "SAVE MY COMPANY - SHARE CHALLENGE":
-  "CHALLENGE A FRIEND";
+ document.getElementById("shareLink").value=getChallengeLink();
 }
 
-async function shareChallenge(){
- if(!finalOutcome)return;
+function getChallengeLink(){
+ if(!finalOutcome)return "";
 
  const payload={
   v:challengeVersion,
@@ -615,34 +658,146 @@ async function shareChallenge(){
 
  const url=new URL(location.href);
  url.searchParams.delete("version");
+ url.searchParams.delete("utm_source");
  url.searchParams.set("challenge",encodeChallenge(payload));
+ return url.toString();
+}
 
- const link=url.toString();
- const message=
+function getShareMessage(){
+ return (
   "I played VECORIQ. "+
   document.getElementById("resultTitle").textContent+
-  " Can you beat my company in the same market? "+
-  link;
+  " Final cash: "+fmt(finalOutcome.cash)+
+  ". Can you beat my company in the same market? "+
+  getChallengeLink()
+ );
+}
 
- const status=document.getElementById("shareStatus");
+function setShareStatus(message){
+ document.getElementById("shareStatus").textContent=message;
+}
 
- if(navigator.share){
-  try{
-   await navigator.share({
-    title:"VECORIQ - Save My Company",
-    text:message
-   });
-   status.textContent="Challenge shared!";
-   return;
-  }catch(e){}
- }
+function selectChallengeLink(){
+ const field=document.getElementById("shareLink");
+ field.focus();
+ field.select();
+ field.setSelectionRange(0,field.value.length);
+}
+
+async function copyChallengeLink(){
+ const link=getChallengeLink();
+ if(!link)return;
 
  try{
-  await navigator.clipboard.writeText(message);
-  status.textContent="Challenge copied! Paste it to a friend.";
+  if(!navigator.clipboard||!navigator.clipboard.writeText){
+   throw new Error("Clipboard API unavailable");
+  }
+  await navigator.clipboard.writeText(link);
+  setShareStatus("CHALLENGE LINK COPIED! Paste it anywhere.");
  }catch(e){
-  prompt("Copy your challenge and send it to a friend:",message);
-  status.textContent="Your challenge is ready to share.";
+  selectChallengeLink();
+  setShareStatus(
+   "Link selected. Press Ctrl+C, then paste it anywhere."
+  );
+ }
+}
+
+function openShareURL(url){
+ const win=window.open(url,"_blank","noopener,noreferrer");
+ if(!win){
+  setShareStatus(
+   "Popup blocked. Use COPY CHALLENGE LINK instead."
+  );
+ }
+}
+
+async function sharePlatform(platform){
+ if(!finalOutcome)return;
+
+ const link=getChallengeLink();
+ const message=getShareMessage();
+ const encodedLink=encodeURIComponent(link);
+ const encodedMessage=encodeURIComponent(message);
+
+ if(platform==="whatsapp"){
+  openShareURL(
+   "https://api.whatsapp.com/send?text="+encodedMessage
+  );
+  return;
+ }
+
+ if(platform==="telegram"){
+  openShareURL(
+   "https://t.me/share/url?url="+encodedLink+
+   "&text="+encodeURIComponent(
+    "Can you beat my VECORIQ company?"
+   )
+  );
+  return;
+ }
+
+ if(platform==="facebook"){
+  openShareURL(
+   "https://www.facebook.com/sharer/sharer.php?u="+
+   encodedLink
+  );
+  return;
+ }
+
+ if(platform==="linkedin"){
+  openShareURL(
+   "https://www.linkedin.com/sharing/share-offsite/?url="+
+   encodedLink
+  );
+  return;
+ }
+
+ if(platform==="x"){
+  openShareURL(
+   "https://twitter.com/intent/tweet?text="+
+   encodeURIComponent(
+    "Can you beat my company in VECORIQ?"
+   )+
+   "&url="+encodedLink
+  );
+  return;
+ }
+
+ if(platform==="email"){
+  location.href=
+   "mailto:?subject="+
+   encodeURIComponent("VECORIQ - Save My Company Challenge")+
+   "&body="+encodedMessage;
+  return;
+ }
+
+ if(platform==="messenger"){
+  // Messenger web does not guarantee prefilled
+  // text or links for every browser/account.
+  await copyChallengeLink();
+  openShareURL("https://www.messenger.com/");
+  setShareStatus(
+   "Open a Messenger chat and paste the copied challenge link."
+  );
+  return;
+ }
+
+ if(platform==="more"){
+  if(navigator.share){
+   try{
+    await navigator.share({
+     title:"VECORIQ - Save My Company",
+     text:"Can you beat my company in VECORIQ?",
+     url:link
+    });
+    return;
+   }catch(e){}
+  }
+
+  await copyChallengeLink();
+  setShareStatus(
+   "Challenge link ready. Paste it into any app."
+  );
  }
 }
 
