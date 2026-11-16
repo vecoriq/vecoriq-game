@@ -1,0 +1,93 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>VECORIQ - The Virtual Economy</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0b1729;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
+    }
+    main {
+      max-width: 600px;
+      margin: 70px auto;
+      padding: 20px;
+    }
+    h1 {
+      font-size: 52px;
+      color: #54d6bb;
+      letter-spacing: 3px;
+    }
+    .panel {
+      background: #172b43;
+      padding: 25px;
+      border-radius: 16px;
+      margin-top: 30px;
+    }
+    .capital {
+      font-size: 34px;
+      font-weight: bold;
+    }
+    button {
+      background: #54d6bb;
+      border: none;
+      border-radius: 10px;
+      padding: 15px 25px;
+      font-size: 17px;
+      font-weight: bold;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    #result {
+      margin-top: 25px;
+      font-size: 20px;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>VECORIQ</h1>
+    <p>THE VIRTUAL ECONOMY</p>
+    <p>Build. Invest. Trade. Save.</p>
+
+    <div class="panel">
+      <h2>Your First Company</h2>
+      <p>Industry: Technology</p>
+      <p>Available Capital</p>
+      <div class="capital" id="capital">$100,000</div>
+
+      <button onclick="invest()">Invest $20,000</button>
+      <div id="result"></div>
+    </div>
+  </main>
+
+  <script>
+    let capital = 100000;
+    let invested = false;
+
+    function invest() {
+      if (invested) return;
+      invested = true;
+
+      const investment = 20000;
+      const revenue = 28000;
+      const costs = 5000;
+      const profit = revenue - costs - investment;
+
+      capital += profit;
+
+      document.getElementById("capital").textContent =
+        "$" + capital.toLocaleString("en-US");
+
+      document.getElementById("result").textContent =
+        "Your first investment generated a net gain of $" +
+        profit.toLocaleString("en-US") + "!";
+    }
+  </script>
+</body>
+</html>
