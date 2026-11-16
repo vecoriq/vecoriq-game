@@ -3,35 +3,36 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>VECORIQ - Save Your Company</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>VECORIQ - Crisis 2.0</title>
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#081525;color:#fff;font-family:Arial,sans-serif}
-main{max-width:650px;margin:auto;padding:20px}
-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px}
-.logo{color:#52d7bd;font-size:27px;font-weight:900;letter-spacing:2px}
-.timer{background:#a42b39;padding:12px 17px;border-radius:12px;font-size:22px;font-weight:bold}
-h1{font-size:clamp(30px,7vw,49px);line-height:1.05;margin:18px 0;color:#fff}
-.subtitle{color:#c4d3e5;line-height:1.5}
-.panel{background:#152a43;border:1px solid #304661;border-radius:18px;padding:22px;margin:18px 0}
-.metrics{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.metric{background:#0c1c30;padding:15px;border-radius:12px}
-.small{font-size:12px;color:#9fb4ca;text-transform:uppercase}
-.value{font-size:26px;font-weight:bold;margin-top:7px}
-.danger{color:#ff737d}
-.good{color:#52d7bd}
-button{width:100%;text-align:left;background:#23415d;color:white;border:1px solid #42627d;border-radius:13px;padding:17px;margin:8px 0;cursor:pointer;font-size:16px}
-button:hover{background:#305a77}
-button:disabled{opacity:.5;cursor:default}
+main{max-width:680px;margin:auto;padding:16px}
+header{display:flex;align-items:center;justify-content:space-between}
+.logo{color:#50d5bd;font-size:28px;font-weight:900;letter-spacing:2px}
+.timer{background:#a52c40;padding:12px 16px;border-radius:12px;font-size:23px;font-weight:bold}
+.track{height:7px;background:#30435a;border-radius:8px;margin:15px 0 23px;overflow:hidden}
+#bar{height:100%;width:100%;background:#50d5bd}
+h1{font-size:clamp(30px,7vw,47px);line-height:1.08;margin:12px 0}
+p{line-height:1.5}
+.muted{color:#bfd0e0}
+.tag{color:#50d5bd;font-size:12px;font-weight:bold;letter-spacing:1px}
+.panel{background:#152a43;border:1px solid #34516a;border-radius:18px;padding:19px;margin:15px 0}
+.metrics{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.metric{background:#0e2035;padding:12px;border-radius:10px}
+.label{font-size:11px;color:#9fb5cb}
+.number{font-size:clamp(17px,4vw,25px);font-weight:bold;margin-top:7px}
+button{display:block;width:100%;text-align:left;padding:15px;margin:9px 0;background:#24435f;color:white;border:1px solid #476984;border-radius:12px;cursor:pointer;font-size:15px}
+button:hover{background:#315a78}
 button strong{display:block;margin-bottom:5px}
-button span{font-size:13px;color:#d0dce8}
-#message{line-height:1.6}
+button span{font-size:12px;color:#d1dfeb}
+.primary{background:#50d5bd;color:#062034;text-align:center;font-weight:bold}
 .hidden{display:none}
 .center{text-align:center}
-.restart{background:#52d7bd;color:#082134;text-align:center;font-weight:bold}
-.progress{height:7px;background:#263a50;border-radius:10px;overflow:hidden}
-#bar{height:100%;width:100%;background:#52d7bd;transition:width .3s}
+.good{color:#50d5bd}
+.bad{color:#ff7885}
+#feedback{color:#f7d78b;font-weight:bold}
 </style>
 </head>
 <body>
@@ -40,96 +41,72 @@ button span{font-size:13px;color:#d0dce8}
 <div class="logo">VECORIQ</div>
 <div class="timer" id="timer">60s</div>
 </header>
-<div class="progress"><div id="bar"></div></div>
+<div class="track"><div id="bar"></div></div>
 
 <section id="game">
-<p class="small" id="round">CRISIS MODE · DECISION 1/3</p>
-<h1 id="headline">YOUR COMPANY IS DYING!</h1>
-<p class="subtitle" id="story">
-Your biggest client just left. Salaries are due tomorrow.
-You have $100,000. Make your move.
+<div class="tag" id="stage">EMERGENCY · 1/3</div>
+<h1 id="headline">YOUR COMPANY HAS 60 SECONDS TO SURVIVE!</h1>
+<p class="muted" id="story">
+Your largest customer is gone. The bank wants its money.
+Your employees expect salaries.
 </p>
 
 <div class="metrics">
 <div class="metric">
-<div class="small">COMPANY CASH</div>
-<div class="value" id="cash">$100,000</div>
+<div class="label">CASH</div>
+<div class="number" id="cash">$70,000</div>
 </div>
 <div class="metric">
-<div class="small">REPUTATION</div>
-<div class="value" id="reputation">60/100</div>
+<div class="label">DEBT</div>
+<div class="number" id="debt">$90,000</div>
+</div>
+<div class="metric">
+<div class="label">CUSTOMERS</div>
+<div class="number" id="customers">60</div>
 </div>
 </div>
 
 <div class="panel">
 <h2 id="question">WHAT WILL YOU DO?</h2>
 <div id="choices"></div>
-<p id="message"></p>
+<p id="feedback"></p>
 </div>
 </section>
 
 <section id="ending" class="panel hidden center">
-<p class="small">VECORIQ · FINAL RESULT</p>
-<h1 id="endingTitle"></h1>
-<p id="endingText"></p>
-<div class="value" id="endingCash"></div>
-<p id="endingDetails"></p>
-<button class="restart" onclick="startGame()">PLAY AGAIN</button>
-<button onclick="shareResult()">CHALLENGE A FRIEND</button>
+<div class="tag">FINAL BOARD DECISION</div>
+<h1 id="resultTitle"></h1>
+<p id="resultStory"></p>
+<h2 id="resultCash"></h2>
+<p id="resultDetails"></p>
+<button class="primary" onclick="startGame()">PLAY AGAIN</button>
+<button onclick="shareChallenge()" id="shareButton">
+CHALLENGE A FRIEND
+</button>
 </section>
 </main>
 
 <script>
-const money=n=>"$"+Math.round(n).toLocaleString("en-US");
-const scenarios=[
-{
-headline:"YOUR COMPANY IS DYING!",
-story:"Your biggest client just left. Salaries are due tomorrow. You have $100,000. Make your move.",
-question:"HOW WILL YOU SURVIVE?",
-choices:[
-{title:"LAUNCH A NEW PRODUCT",detail:"Spend $60,000. High risk, high potential.",cash:-60000,rep:8,flag:"product"},
-{title:"FIND AN INVESTOR",detail:"Raise $80,000, sell 30% of your company.",cash:80000,rep:3,flag:"investor"},
-{title:"CUT COSTS",detail:"Save $25,000, but damage team morale.",cash:25000,rep:-18,flag:"cuts"}
-]
-},
-{
-headline:"BREAKING: THE MARKET JUST CHANGED!",
-story:"A competitor slashes prices. Customers are leaving. Your next move could save everything.",
-question:"WHAT IS YOUR RESPONSE?",
-choices:[
-{title:"FIGHT ON PRICE",detail:"Spend $35,000 to win customers back.",cash:-35000,rep:12,flag:"price"},
-{title:"FOCUS ON QUALITY",detail:"Invest $20,000 in a premium offer.",cash:-20000,rep:15,flag:"quality"},
-{title:"PROTECT YOUR CASH",detail:"Delay expansion and reduce spending.",cash:10000,rep:-8,flag:"protect"}
-]
-},
-{
-headline:"FINAL MOVE: THE BIG OPPORTUNITY!",
-story:"A major customer offers a contract. Can your company deliver?",
-question:"MAKE YOUR FINAL DECISION.",
-choices:[
-{title:"TAKE THE BIG CONTRACT",detail:"High revenue, but expensive delivery.",cash:-30000,rep:5,flag:"contract"},
-{title:"GROW SLOWLY",detail:"Smaller deal, more predictable costs.",cash:15000,rep:5,flag:"steady"},
-{title:"SELL A STAKE",detail:"Raise $50,000, give away 20% ownership.",cash:50000,rep:0,flag:"stake"}
-]
-}
-];
+const fmt=n=>"$"+Math.round(n).toLocaleString("en-US");
 
-let cash,rep,ownership,step,history,seconds,interval,active;
+let state,step,seconds,interval,active,shock,events;
 
 function startGame(){
 clearInterval(interval);
-cash=100000;rep=60;ownership=100;
-step=0;history=[];seconds=60;active=true;
+state={cash:70000,debt:90000,customers:60,
+reputation:65,ownership:100};
+step=0;seconds=60;active=true;events=[];
+shock=Math.random()<0.5?"recession":"boom";
 document.getElementById("game").classList.remove("hidden");
 document.getElementById("ending").classList.add("hidden");
-updateMetrics();
-showStep();
+update();
+render();
 tick();
 interval=setInterval(()=>{
 if(!active)return;
 seconds--;
 tick();
-if(seconds<=0)finish(true);
+if(seconds<=0)finish("timeout");
 },1000);
 }
 
@@ -138,95 +115,192 @@ document.getElementById("timer").textContent=seconds+"s";
 document.getElementById("bar").style.width=(seconds/60*100)+"%";
 }
 
-function updateMetrics(){
-document.getElementById("cash").textContent=money(cash);
-document.getElementById("reputation").textContent=rep+"/100";
+function update(){
+document.getElementById("cash").textContent=fmt(state.cash);
+document.getElementById("debt").textContent=fmt(state.debt);
+document.getElementById("customers").textContent=state.customers;
 }
 
-function showStep(){
-const s=scenarios[step];
-document.getElementById("round").textContent=
-"CRISIS MODE · DECISION "+(step+1)+"/3";
-document.getElementById("headline").textContent=s.headline;
-document.getElementById("story").textContent=s.story;
-document.getElementById("question").textContent=s.question;
-document.getElementById("message").textContent="";
+function getRound(){
+if(step===0)return{
+headline:"YOUR COMPANY IS RUNNING OUT OF MONEY!",
+story:"A major client has left. You owe the bank $90,000. Your next decision could destroy the business.",
+question:"HOW DO YOU RESPOND?",
+choices:[
+["LAUNCH A PRODUCT","Spend $45,000. Win customers if demand holds.","product"],
+["SELL 30% TO AN INVESTOR","Receive $75,000, but lose ownership.","investor"],
+["CUT COSTS","Save $20,000, but lose customers and trust.","cuts"]
+]};
+if(step===1)return{
+headline:shock==="recession"?"BREAKING: ECONOMIC RECESSION!":"BREAKING: MARKET DEMAND EXPLODES!",
+story:shock==="recession"?
+"Consumers are spending less. Your business must adapt.":
+"Demand is surging. Competitors are racing to expand.",
+question:"WHAT IS YOUR NEXT MOVE?",
+choices:[
+["EXPAND AGGRESSIVELY","Spend $40,000 to capture market share.","expand"],
+["RENEGOTIATE THE BANK LOAN","Pay $10,000 in fees to reduce immediate pressure.","renegotiate"],
+["FOCUS ON EXISTING CUSTOMERS","Spend $15,000 to strengthen loyalty.","loyalty"]
+]};
+return{
+headline:"THE BANK DEMANDS A FINAL DECISION!",
+story:"Your loan is under review. The board must decide the company's future.",
+question:"HOW DO YOU FINISH?",
+choices:[
+["PAY DOWN DEBT","Use up to $50,000 of cash to repay the bank.","repay"],
+["ACCEPT A STRATEGIC INVESTOR","Raise $60,000, sell another 25% of the company.","sell"],
+["BET ON A BIG CONTRACT","Spend $25,000 and take a commercial risk.","contract"]
+]};
+}
+
+function render(){
+const r=getRound();
+document.getElementById("stage").textContent="CRISIS · DECISION "+(step+1)+"/3";
+document.getElementById("headline").textContent=r.headline;
+document.getElementById("story").textContent=r.story;
+document.getElementById("question").textContent=r.question;
+document.getElementById("feedback").textContent="";
 const area=document.getElementById("choices");
-area.innerHTML="";
-s.choices.forEach((c,i)=>{
+area.replaceChildren();
+r.choices.forEach(c=>{
 const b=document.createElement("button");
-const strong=document.createElement("strong");
-strong.textContent=String.fromCharCode(65+i)+". "+c.title;
+const name=document.createElement("strong");
+name.textContent=c[0];
 const detail=document.createElement("span");
-detail.textContent=c.detail;
-b.append(strong,detail);
-b.onclick=()=>choose(c);
+detail.textContent=c[1];
+b.append(name,detail);
+b.onclick=()=>choose(c[2]);
 area.appendChild(b);
 });
 }
 
-function choose(c){
+function choose(action){
 if(!active)return;
-cash+=c.cash;
-rep=Math.max(0,Math.min(100,rep+c.rep));
-if(c.flag==="investor")ownership-=30;
-if(c.flag==="stake")ownership-=20;
-history.push(c.flag);
-updateMetrics();
+let s=state;
+let note="";
+if(action==="product"){
+s.cash-=45000;
+s.customers+=shock==="boom"?40:12;
+s.reputation+=6;
+note="Product development consumed cash.";
+}
+if(action==="investor"){
+s.cash+=75000;s.ownership-=30;
+note="New capital arrived, but your ownership fell.";
+}
+if(action==="cuts"){
+s.cash+=20000;s.customers-=22;s.reputation-=20;
+note="Costs fell, but customers lost confidence.";
+}
+if(action==="expand"){
+s.cash-=40000;
+s.customers+=shock==="boom"?55:8;
+note="Expansion increased capacity and costs.";
+}
+if(action==="renegotiate"){
+s.cash-=10000;s.debt-=20000;
+note="The bank agreed to restructure part of the debt.";
+}
+if(action==="loyalty"){
+s.cash-=15000;s.customers+=18;s.reputation+=12;
+note="Customer retention improved.";
+}
+if(action==="repay"){
+const payment=Math.min(50000,Math.max(0,s.cash));
+s.cash-=payment;s.debt-=Math.min(s.debt,payment);
+note="You repaid "+fmt(payment)+" of bank debt.";
+}
+if(action==="sell"){
+s.cash+=60000;s.ownership-=25;
+note="You raised funds by selling more shares.";
+}
+if(action==="contract"){
+s.cash-=25000;
+s.customers+=shock==="boom"?35:5;
+note="You accepted a risky commercial contract.";
+}
+events.push(note);
 
+if(step===0){
+if(shock==="recession"){
+s.customers=Math.max(0,s.customers-20);
+events.push("Recession reduced demand.");
+}else{
+s.customers+=20;
+events.push("Market growth increased demand.");
+}
+}
+if(step===1){
+const revenue=s.customers*650;
+const costs=45000;
+const interest=Math.round(s.debt*0.05);
+s.cash+=revenue-costs-interest;
+events.push("Operating cash flow: "+fmt(revenue-costs-interest));
+}
 if(step===2){
-finish(false);
+const revenue=s.customers*500;
+const costs=42000;
+const interest=Math.round(s.debt*0.05);
+s.cash+=revenue-costs-interest;
+events.push("Final cash flow: "+fmt(revenue-costs-interest));
+}
+
+s.customers=Math.max(0,s.customers);
+s.reputation=Math.max(0,Math.min(100,s.reputation));
+update();
+if(s.cash<0&&step<2){
+finish("bankrupt");
 return;
 }
 step++;
-showStep();
+if(step>=3)finish("completed");
+else render();
 }
 
-function finish(timedOut){
+function finish(reason){
 if(!active)return;
 active=false;
 clearInterval(interval);
-
-let operatingReturn=0;
-if(!timedOut){
-if(history.includes("product"))operatingReturn+=85000;
-if(history.includes("price"))operatingReturn+=47000;
-if(history.includes("quality"))operatingReturn+=42000;
-if(history.includes("contract"))operatingReturn+=65000;
-if(history.includes("steady"))operatingReturn+=18000;
-if(history.includes("cuts"))operatingReturn-=12000;
-if(history.includes("protect"))operatingReturn-=15000;
-cash+=operatingReturn;
+const s=state;
+const failed=reason==="timeout"||reason==="bankrupt"||
+s.cash<0||s.customers<25||s.reputation<35;
+const thriving=!failed&&s.cash>100000&&s.customers>=80;
+let title,story;
+if(reason==="timeout"){
+title="TIME IS UP!";
+story="The board ran out of time.";
+}else if(failed){
+title="YOUR COMPANY COLLAPSED!";
+story="Liquidity, customers or reputation fell below survival levels.";
+}else if(thriving){
+title="YOU BUILT A WINNER!";
+story="Your company survived and found a path to growth.";
+}else{
+title="YOU SURVIVED... BARELY!";
+story="The company is alive, but its future remains uncertain.";
 }
-const survived=!timedOut&&cash>0&&rep>=30;
 document.getElementById("game").classList.add("hidden");
 document.getElementById("ending").classList.remove("hidden");
-document.getElementById("endingTitle").textContent=
-timedOut?"TIME IS UP!":survived?"YOU SAVED THE COMPANY!":"YOUR COMPANY COLLAPSED!";
-document.getElementById("endingText").textContent=
-timedOut?"The board removed you before you could complete your plan.":
-survived?"Your strategy kept the business alive. Can you do better?":
-"Your decisions left the company without a viable future.";
-document.getElementById("endingCash").textContent=money(cash);
-document.getElementById("endingDetails").textContent=
-"Reputation: "+rep+"/100 · Your ownership: "+ownership+"%"+
-(!timedOut?" · Operating result: "+money(operatingReturn):"");
+document.getElementById("resultTitle").textContent=title;
+document.getElementById("resultStory").textContent=story;
+document.getElementById("resultCash").textContent="Cash: "+fmt(s.cash);
+document.getElementById("resultDetails").textContent=
+"Debt: "+fmt(s.debt)+" · Customers: "+s.customers+
+" · Reputation: "+s.reputation+"/100 · Ownership: "+s.ownership+"%";
+document.getElementById("shareButton").textContent=
+failed?"SAVE MY COMPANY - SHARE CHALLENGE":"CHALLENGE A FRIEND";
 }
 
-async function shareResult(){
-const title=document.getElementById("endingTitle").textContent;
-const message="I played VECORIQ: "+title+
-" Final cash: "+money(cash)+
-". Can you beat my result?";
+async function shareChallenge(){
+const message="I played VECORIQ. "+
+document.getElementById("resultTitle").textContent+
+" Final cash: "+fmt(state.cash)+
+". Can you save this company?";
 if(navigator.share){
 try{await navigator.share({title:"VECORIQ",text:message});}
 catch(e){}
-}else if(navigator.clipboard&&window.isSecureContext){
-try{await navigator.clipboard.writeText(message);
-alert("Challenge copied!");}
-catch(e){prompt("Copy your challenge:",message);}
 }else{
-prompt("Copy your challenge:",message);
+prompt("Copy this challenge:",message);
 }
 }
 
