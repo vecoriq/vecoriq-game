@@ -37,6 +37,11 @@ button span{font-size:12px;color:#d1dfeb}
 #feedback{color:#f7d78b;font-weight:bold}
 #question{font-size:17px;margin:2px 0 8px}
 #feedback:empty{display:none}
+#reportMetrics{margin:12px 0;grid-template-columns:repeat(2,1fr)}
+.reportLine{display:flex;justify-content:space-between;gap:12px;padding:7px 0;border-bottom:1px solid #34516a;font-size:13px}
+.reportLine strong{text-align:right}
+#decisionDetails p{padding:6px 0;border-bottom:1px solid #34516a}
+.timer.paused{background:#315a78!important}
 #timeNotice{font-size:13px;color:#f7d78b;margin:5px 0}
 #ownershipNotice{font-size:12px;color:#b7cbdc;margin:6px 0}
 #ending h1{font-size:clamp(25px,6vw,38px)}
@@ -84,7 +89,7 @@ button span{font-size:11px}.shareGrid{gap:5px}
 
 <header>
 <div class="logo">VECORIQ</div>
-<div class="timer" id="timer">60s</div>
+<div class="timer" id="timer">10s</div>
 </header>
 <div class="track"><div id="bar"></div></div>
 <p id="timeNotice" role="status" aria-live="polite"></p>
@@ -173,7 +178,7 @@ PLAY VECORIQ - FREE
 <section id="game" class="hidden">
 <div class="companyBadge" id="gameCompanyName"></div>
 <div class="tag" id="stage">EMERGENCY · 1/3</div>
-<h1 id="headline">YOUR COMPANY HAS 60 SECONDS TO SURVIVE!</h1>
+<h1 id="headline">BUILD YOUR COMPANY - 30 DECISIONS</h1>
 <p class="muted" id="story"></p>
 <div id="ownershipNotice"></div>
 
@@ -199,6 +204,17 @@ PLAY VECORIQ - FREE
 </div>
 </section>
 
+<section id="sessionReport" class="panel hidden">
+<div class="tag" id="reportStage">BOARD REPORT</div>
+<h1>YOUR COMPANY - FINANCIAL REPORT</h1>
+<p id="sessionSummary" class="muted"></p>
+<div class="metrics" id="reportMetrics"></div>
+<div class="panel"><h2>INCOME & EXPENSES</h2><div id="incomeDetails"></div></div>
+<div class="panel"><h2>YOUR 3 DECISIONS</h2><div id="decisionDetails"></div></div>
+<p class="notice" id="sessionWarning"></p>
+<button class="primary" onclick="continueSession()" id="continueButton">CONTINUE - NEXT 10 SECONDS</button>
+<p class="notice center">Take as much time as you need to review. Your timer is paused. Progress is saved on this device.</p>
+</section>
 <section id="ending" class="panel hidden center">
 <div class="tag">FINAL BOARD DECISION</div>
 <div class="companyBadge" id="endingCompanyName"></div>
@@ -289,6 +305,9 @@ const ledgerKey="vecoriq_time_penalties_v1";
 const companyKey="vecoriq_company_name_v1";
 const challengeVersion=1;
 const reportVersion=1;
+const progressKey="vecoriq_business_progress_v2";
+const TOTAL_DECISIONS=30;
+const SESSION_SIZE=3;
 
 let state,step,seconds,interval,active,shock,events,penalized;
 let cumulativePenalties=readPenalties();
@@ -296,6 +315,9 @@ let companyName=readCompanyName();
 let incomingChallenge=null;
 let currentChallenge=null;
 let finalOutcome=null;
+let sessionStart=null, sessionLedger=null, sessionNotes=[], sessionNumber=0;
+let timerDeadline=0, remainingSeconds=10, sessionTimedOut=false, finished=false;
+let sessionMarket="boom";
 
 function el(id){
  return document.getElementById(id);
@@ -352,9 +374,10 @@ function showCompanyIntro(){
  el("challengeIntro").classList.add("hidden");
  el("rescueReport").classList.add("hidden");
  el("companyIntro").classList.remove("hidden");
+  el("sessionReport").classList.add("hidden");
  el("companyNameInput").value=companyName;
  el("nameError").textContent="";
- el("timer").textContent="60s";
+ el("timer").textContent="10s";
  el("bar").style.width="100%";
  el("timeNotice").textContent="";
  el("companyNameInput").focus();
@@ -537,8 +560,9 @@ function showChallengeIntro(data){
  el("companyIntro").classList.add("hidden");
  el("rescueReport").classList.add("hidden");
  el("challengeIntro").classList.remove("hidden");
+  el("sessionReport").classList.add("hidden");
 
- el("timer").textContent="60s";
+ el("timer").textContent="10s";
  el("bar").style.width="100%";
  el("timeNotice").textContent="";
 
@@ -586,282 +610,395 @@ function playFresh(){
  }
 }
 
+function clearSavedProgress(){
+ try{localStorage.removeItem(progressKey);}catch(e){}
+}
+function saveProgress(){
+ if(currentChallenge||!active)return;
+ try{
+  localStorage.setItem(progressKey,JSON.stringify({v:2,companyName,state,step,shock,
+   sessionStart,sessionLedger,sessionNotes,sessionNumber,events,
+   phase:el("sessionReport").classList.contains("hidden")?"playing":"report",
+   remainingSeconds:Math.max(0,Math.ceil((timerDeadline-Date.now())/1000)),
+   sessionTimedOut,penalized}));
+ }catch(e){}
+}
+function loadProgress(){
+ try{
+  const d=JSON.parse(localStorage.getItem(progressKey)||"null");
+  if(!d||d.v!==2||d.companyName!==companyName||!d.state||
+   !Number.isInteger(d.step)||d.step<0||d.step>TOTAL_DECISIONS||
+    (d.step===TOTAL_DECISIONS&&d.phase!=="report")||
+   !["boom","recession"].includes(d.shock))return null;
+  return d;
+ }catch(e){return null;}
+}
+function restoreProgress(d){
+ clearInterval(interval);
+ currentChallenge=null; finalOutcome=null;
+ state=d.state;step=d.step;shock=d.shock;
+ sessionStart=d.sessionStart||{...state};
+ sessionLedger=d.sessionLedger||emptyLedger();
+ sessionNotes=Array.isArray(d.sessionNotes)?d.sessionNotes:[];
+ sessionNumber=d.sessionNumber||Math.floor(step/3)+1;
+ events=Array.isArray(d.events)?d.events:[];
+ penalized=!!d.penalized;sessionTimedOut=!!d.sessionTimedOut;
+ active=true;finished=false;
+ el("gameCompanyName").textContent="COMPANY: "+companyName;
+ hideScreens();update();updateOwnership();
+ if(d.phase==="report"){
+  showSessionReport();
+ }else{
+  timerDeadline=Number.isFinite(d.timerDeadline)?d.timerDeadline:0;
+  remainingSeconds=Math.max(0,Math.ceil((timerDeadline-Date.now())/1000));
+  if(!sessionTimedOut&&remainingSeconds<=0){applyTimePenalty();sessionTimedOut=true;}
+  if(!sessionTimedOut&&remainingSeconds>0){
+   el("timeNotice").textContent="SESSION RESUMED - complete the remaining decisions before the deadline.";
+   interval=setInterval(()=>{
+    if(!active||finished){clearInterval(interval);return;}
+    remainingSeconds=Math.max(0,Math.ceil((timerDeadline-Date.now())/1000));
+    tick();
+    if(remainingSeconds<=0){
+     clearInterval(interval);sessionTimedOut=true;applyTimePenalty();
+     el("timeNotice").textContent="TIME EXPIRED. Finish the remaining decisions without a timer.";
+     saveProgress();
+    }
+   },100);
+  }else{
+   remainingSeconds=0;
+   el("timeNotice").textContent="SESSION DEADLINE EXPIRED - finish without another penalty.";
+  }
+  tick();el("game").classList.remove("hidden");render();saveProgress();
+ }
+}
+function hideScreens(){
+ ["game","ending","challengeIntro","companyIntro","rescueReport","sessionReport"].forEach(id=>el(id).classList.add("hidden"));
+}
+function emptyLedger(){return {revenue:0,expenses:0,interest:0,financing:0,investments:0,debtChange:0};}
 function startGame(challenge=null){
  clearInterval(interval);
- currentChallenge=challenge;
- finalOutcome=null;
-
- state={
-  cash:70000,
-  debt:90000,
-  customers:60,
-  reputation:65,
-  ownership:challenge?
-   100:Math.max(0,100-cumulativePenalties)
- };
-
- step=0;
- seconds=120;
- active=true;
- penalized=false;
- events=[];
-
- shock=challenge?
-  challenge.market:
-  (Math.random()<0.5?"recession":"boom");
-
- el("gameCompanyName").textContent=
-  (challenge?"RESCUING: ":"COMPANY: ")+
-  effectiveCompanyName();
-
- el("game").classList.remove("hidden");
- el("ending").classList.add("hidden");
- el("challengeIntro").classList.add("hidden");
- el("companyIntro").classList.add("hidden");
- el("rescueReport").classList.add("hidden");
-
- el("timeNotice").textContent="";
- el("shareStatus").textContent="";
+ currentChallenge=challenge;finalOutcome=null;finished=false;
+ if(!challenge)clearSavedProgress();
+ state={cash:70000,debt:90000,customers:60,reputation:65,
+  ownership:challenge?100:Math.max(0,100-cumulativePenalties)};
+ step=0;active=true;events=[];
+ shock=challenge?challenge.market:(Math.random()<0.5?"recession":"boom");
+ el("gameCompanyName").textContent=(challenge?"RESCUING: ":"COMPANY: ")+effectiveCompanyName();
+ hideScreens();el("game").classList.remove("hidden");
+ el("timeNotice").textContent="";el("shareStatus").textContent="";
  el("reportStatus").textContent="";
-
- update();
- updateOwnership();
- render();
- tick();
-
+ update();updateOwnership();beginSession();
+}
+function beginSession(){
+ clearInterval(interval);
+ sessionNumber=Math.floor(step/SESSION_SIZE)+1;
+ sessionStart={...state};sessionLedger=emptyLedger();sessionNotes=[];
+ penalized=false;sessionTimedOut=false;remainingSeconds=10;
+ el("timeNotice").textContent="3 decisions in 10 seconds. One 0.1% penalty if time expires.";
+ el("sessionReport").classList.add("hidden");el("game").classList.remove("hidden");
+ timerDeadline=Date.now()+10000;
+ tick();render();saveProgress();
  interval=setInterval(()=>{
-  if(!active)return;
-  seconds--;
+  if(!active||finished)return;
+  remainingSeconds=Math.max(0,Math.ceil((timerDeadline-Date.now())/1000));
   tick();
-
-  if(seconds===60){
-   el("timeNotice").textContent=
-    "BOARD MEETING EXTENDED - 60 extra seconds to finish your decisions.";
+  if(remainingSeconds<=0){
+   clearInterval(interval);sessionTimedOut=true;applyTimePenalty();
+   el("timeNotice").textContent=currentChallenge?
+    "TIME EXPIRED. Finish the remaining decisions without a timer. Your own shares are safe.":
+    "TIME EXPIRED: 0.1% transferred to VECORIQ Holdings. Finish remaining decisions without a timer.";
+   saveProgress();
   }
-
-  if(seconds<=0){
-   seconds=0;
-   applyTimePenalty();
-   clearInterval(interval);
-
-   if(currentChallenge){
-    el("timeNotice").textContent=
-     "Rescue deadline exceeded. You may finish your decisions. Your own company's shares are not affected.";
-   }else{
-    el("timeNotice").textContent=
-     "Deadline exceeded: 0.1% of your company transferred to VECORIQ Holdings. You may finish your decisions without further time penalties.";
-   }
-
-   tick();
-  }
- },1000);
+ },100);
 }
-
 function tick(){
- el("timer").textContent=
-  seconds>60?(seconds-60)+"s":seconds+"s";
-
- el("bar").style.width=
-  (Math.min(60,seconds)/60*100)+"%";
-
- el("timer").style.background=
-  seconds>60?"#a52c40":
-  seconds>0?"#8d5b21":"#59657a";
+ const t=el("timer");
+ t.textContent=remainingSeconds+"s";
+ el("bar").style.width=(remainingSeconds*10)+"%";
+ t.style.background=remainingSeconds>3?"#a52c40":remainingSeconds>0?"#8d5b21":"#59657a";
 }
-
+function pauseTimer(){
+ clearInterval(interval);remainingSeconds=Math.max(0,Math.ceil((timerDeadline-Date.now())/1000));
+ el("timer").textContent="PAUSED";el("bar").style.width="100%";
+ el("timer").style.background="#315a78";
+}
 function update(){
  el("cash").textContent=fmt(state.cash);
  el("debt").textContent=fmt(state.debt);
  el("customers").textContent=state.customers;
 }
-
+const rounds=[
+ ["LIQUIDITY EMERGENCY","A major client left. The bank expects payments.",
+  ["LAUNCH A NEW PRODUCT","Invest $45,000 to attract customers.","product"],
+  ["SELL 30% TO AN INVESTOR","Receive $75,000 in new capital.","investor"],
+  ["CUT OPERATING COSTS","Save $20,000 but risk customer trust.","cuts"]],
+ ["THE ECONOMY CHANGES","Demand is moving fast. Adjust your strategy.",
+  ["EXPAND CAPACITY","Invest $40,000 to grow.","expand"],
+  ["RENEGOTIATE YOUR LOAN","Pay $10,000 in fees to reduce debt.","renegotiate"],
+  ["REWARD LOYAL CUSTOMERS","Spend $15,000 to retain customers.","loyalty"]],
+ ["THE BANK CALLS","Your lenders want to see a clear plan.",
+  ["REPAY BANK DEBT","Use up to $50,000 to reduce debt.","repay"],
+  ["SELL 25% MORE SHARES","Raise $60,000, but dilute ownership.","sell"],
+  ["CHASE A BIG CONTRACT","Risk $25,000 for new clients.","contract"]],
+ ["HIRING PRESSURE","Your team is overloaded and orders are delayed.",
+  ["HIRE SPECIALISTS","Spend $18,000; improve service and sales.","hire"],
+  ["USE CONTRACTORS","Spend $9,000; increase capacity moderately.","contractors"],
+  ["FREEZE RECRUITMENT","Save $8,000 but damage service quality.","freeze"]],
+ ["A RIVAL SLASHES PRICES","Your biggest competitor launches a price war.",
+  ["MATCH THE DISCOUNT","Win clients, sacrifice margins.","discount"],
+  ["PROTECT PREMIUM QUALITY","Invest in quality and reputation.","premium"],
+  ["BUNDLE SERVICES","Offer packages with a moderate cost.","bundle"]],
+ ["SUPPLY CHAIN SHOCK","A supplier suddenly raises its prices.",
+  ["FIND A NEW SUPPLIER","Spend $12,000 to diversify supply.","supplier"],
+  ["BUY INVENTORY NOW","Invest $22,000 to secure stock.","inventory"],
+  ["PASS COSTS TO CUSTOMERS","Protect margins but risk losing clients.","raiseprices"]],
+ ["EXPORT OPPORTUNITY","A foreign distributor wants your products.",
+  ["ENTER THE EXPORT MARKET","Invest $30,000 for rapid growth.","export"],
+  ["TEST WITH A PILOT","Spend $12,000 for measured expansion.","pilot"],
+  ["FOCUS ON YOUR HOME MARKET","Avoid risk and improve local retention.","domestic"]],
+ ["CYBERSECURITY WARNING","Your systems show signs of attempted intrusion.",
+  ["UPGRADE SECURITY","Invest $16,000 and protect your reputation.","security"],
+  ["BUY CYBER INSURANCE","Spend $8,000 for partial protection.","insurance"],
+  ["IGNORE THE WARNING","Save money but accept serious risk.","ignorecyber"]],
+ ["CUSTOMER COMPLAINTS","Negative reviews are spreading online.",
+  ["REFUND AND FIX","Spend $14,000 to restore trust.","refund"],
+  ["LAUNCH SUPPORT HOTLINE","Spend $9,000 to improve service.","support"],
+  ["DENY RESPONSIBILITY","Avoid immediate cost, risk reputation.","deny"]],
+ ["INFLATION SPIKES","Operating costs are rising across the market.",
+  ["AUTOMATE OPERATIONS","Invest $28,000 to lower future costs.","automate"],
+  ["REVISE YOUR PRICES","Boost revenue but lose some clients.","reprice"],
+  ["REDUCE YOUR FOOTPRINT","Save $16,000 with reputational risk.","footprint"]],
+ ["A BIG RETAILER CALLS","A chain offers a major distribution deal.",
+  ["SIGN AN EXCLUSIVE DEAL","Receive cash but surrender flexibility.","exclusive"],
+  ["NEGOTIATE NONEXCLUSIVE TERMS","Smaller upside, more freedom.","nonexclusive"],
+  ["BUILD DIRECT SALES","Invest $19,000 in your own channels.","direct"]],
+ ["YOUR STAFF DEMANDS A RAISE","Employees threaten to leave without action.",
+  ["INCREASE PAY","Spend $17,000 to retain talent.","payraise"],
+  ["OFFER PERFORMANCE BONUSES","Spend $10,000, link rewards to results.","bonus"],
+  ["REJECT THE REQUEST","Save money but risk resignations.","rejectpay"]],
+ ["A BANK OFFERS CREDIT","You qualify for new financing.",
+  ["BORROW $60,000","Boost cash but increase debt.","borrow"],
+  ["BORROW $25,000","Take a smaller loan.","smallborrow"],
+  ["DECLINE NEW DEBT","Stay independent and grow organically.","decline"]],
+ ["YOUR BRAND GOES VIRAL","An influencer unexpectedly mentions your company.",
+  ["AMPLIFY THE CAMPAIGN","Spend $20,000 for fast customer growth.","viral"],
+  ["PREPARE CUSTOMER SUPPORT","Spend $11,000 to handle demand.","prepare"],
+  ["LET IT GROW NATURALLY","No upfront spending; uncertain impact.","organic"]],
+ ["A PARTNER WANTS TO MERGE","Another company proposes combining operations.",
+  ["ACCEPT THE MERGER","Gain cash and customers; sell 15% equity.","merge"],
+  ["FORM A JOINT VENTURE","Invest $15,000 for shared growth.","joint"],
+  ["STAY INDEPENDENT","Invest $8,000 in your own business.","independent"]],
+ ["ENERGY PRICES SURGE","Utility costs threaten your margins.",
+  ["INSTALL EFFICIENT EQUIPMENT","Invest $24,000 for long-term savings.","efficient"],
+  ["SIGN A FIXED-RATE CONTRACT","Pay $10,000 to stabilize costs.","fixedenergy"],
+  ["ACCEPT THE HIGHER COST","No investment; absorb the pressure.","energycost"]],
+ ["A REGULATORY AUDIT","Inspectors request proof of compliance.",
+  ["UPGRADE COMPLIANCE","Spend $14,000 and reduce legal risk.","compliance"],
+  ["HIRE AN ADVISOR","Spend $7,000 for expert review.","advisor"],
+  ["DELAY THE RESPONSE","Save cash now but risk penalties.","delayaudit"]],
+ ["AN INVESTOR OFFERS HELP","A fund is interested in your company.",
+  ["SELL 10% FOR $45,000","Raise capital with limited dilution.","fund"],
+  ["TAKE A CONVERTIBLE LOAN","Raise $35,000 as debt for now.","convertible"],
+  ["REFUSE THE INVESTMENT","Keep your ownership intact.","refusefund"]],
+ ["AN AI OPPORTUNITY","New software could improve productivity.",
+  ["DEPLOY AI TOOLS","Invest $21,000 for efficiency.","ai"],
+  ["RUN A SMALL PILOT","Spend $8,000 and learn first.","aipilot"],
+  ["KEEP CURRENT SYSTEMS","Avoid disruption but miss efficiency.","noai"]],
+ ["YOUR MAIN CLIENT MAY LEAVE","A customer representing major revenue is unhappy.",
+  ["OFFER A RETENTION DEAL","Spend $13,000 to secure the account.","retain"],
+  ["DIVERSIFY CLIENTS","Invest $18,000 in new customers.","diversify"],
+  ["CALL THEIR BLUFF","Risk losing a major account.","bluff"]],
+ ["YOUR BANK RAISES INTEREST","Borrowing costs are climbing.",
+  ["PAY DOWN $35,000","Reduce principal using available cash.","pay35"],
+  ["REFINANCE","Spend $9,000 to cut borrowing costs.","refinance"],
+  ["WAIT FOR LOWER RATES","Keep cash and accept higher interest.","waitrates"]],
+ ["A FOREIGN MARKET OPENS","Trade barriers fall in a nearby country.",
+  ["OPEN A BRANCH","Invest $38,000 for international reach.","branch"],
+  ["SIGN A LOCAL DISTRIBUTOR","Spend $14,000 for moderate growth.","distributor"],
+  ["STRENGTHEN DOMESTIC SALES","Invest $10,000 locally.","local"]],
+ ["YOUR PRODUCT IS COPIED","A competitor launches a similar product.",
+  ["INNOVATE A NEW VERSION","Invest $25,000 in differentiation.","innovate"],
+  ["DEFEND YOUR BRAND","Spend $12,000 on legal and marketing.","defend"],
+  ["COMPETE ON PRICE","Lower margins to defend customers.","compete"]],
+ ["A CASH-FLOW GAP","Suppliers demand payment before customers pay.",
+  ["FACTOR RECEIVABLES","Receive $25,000 but pay a financing fee.","factor"],
+  ["NEGOTIATE PAYMENT TERMS","Spend $5,000 to ease pressure.","terms"],
+  ["DELAY SUPPLIER PAYMENTS","Keep cash but damage relationships.","delaypay"]],
+ ["A TAKEOVER TARGET APPEARS","A smaller rival is available for purchase.",
+  ["BUY THE COMPETITOR","Invest $42,000 to acquire customers.","acquire"],
+  ["BUY A MINORITY STAKE","Invest $18,000 for a strategic foothold.","stake"],
+  ["WALK AWAY","Keep cash for your own business.","walk"]],
+ ["A PUBLIC RELATIONS CRISIS","A negative story attracts media attention.",
+  ["BE TRANSPARENT","Spend $12,000 to fix the issue.","transparent"],
+  ["HIRE CRISIS EXPERTS","Spend $19,000 for professional response.","crisis"],
+  ["STAY SILENT","Save money but risk reputation.","silent"]],
+ ["A MAJOR CONTRACT EXPIRES","Your largest agreement is up for renewal.",
+  ["OFFER A LONG-TERM DISCOUNT","Secure clients at lower margins.","longterm"],
+  ["NEGOTIATE BETTER PRICES","Increase margins with some risk.","betterprices"],
+  ["FIND REPLACEMENT CLIENTS","Invest $20,000 in new demand.","replace"]],
+ ["THE BOARD REVIEWS YOUR DEBT","Investors question your balance sheet.",
+  ["REPAY $45,000","Reduce debt using available cash.","pay45"],
+  ["ISSUE 10% NEW SHARES","Raise $40,000 without new debt.","issue"],
+  ["INVEST IN GROWTH","Spend $23,000 to seek higher revenue.","growth"]],
+ ["A FINAL EXPANSION CHOICE","Your company is ready for its next stage.",
+  ["SCALE NATIONWIDE","Invest $36,000 for aggressive growth.","nationwide"],
+  ["OPTIMIZE OPERATIONS","Invest $16,000 for stability.","optimize"],
+  ["BUILD A CASH RESERVE","Conserve funds and strengthen resilience.","reserve"]],
+ ["YOUR LAST BOARD MEETING","Decide what kind of company you will leave behind.",
+  ["INVEST FOR THE FUTURE","Spend $30,000 on long-term development.","future"],
+  ["PAY DOWN REMAINING DEBT","Use up to $50,000 to reduce borrowing.","finalrepay"],
+  ["REWARD YOUR CUSTOMERS","Spend $14,000 on retention and trust.","finalcustomers"]]
+];
 function getRound(){
- if(step===0)return{
-  headline:"YOUR COMPANY IS RUNNING OUT OF MONEY!",
-  story:"A major client has left. You owe the bank $90,000. Your next decision could destroy the business.",
-  question:"HOW DO YOU RESPOND?",
-  choices:[
-   ["LAUNCH A PRODUCT","Spend $45,000. Win customers if demand holds.","product"],
-   ["SELL 30% TO AN INVESTOR","Receive $75,000, but lose ownership.","investor"],
-   ["CUT COSTS","Save $20,000, but lose customers and trust.","cuts"]
-  ]
- };
-
- if(step===1)return{
-  headline:shock==="recession"?
-   "BREAKING: ECONOMIC RECESSION!":
-   "BREAKING: MARKET DEMAND EXPLODES!",
-  story:shock==="recession"?
-   "Consumers are spending less. Your business must adapt.":
-   "Demand is surging. Competitors are racing to expand.",
-  question:"WHAT IS YOUR NEXT MOVE?",
-  choices:[
-   ["EXPAND AGGRESSIVELY","Spend $40,000 to capture market share.","expand"],
-   ["RENEGOTIATE THE BANK LOAN","Pay $10,000 in fees to reduce immediate pressure.","renegotiate"],
-   ["FOCUS ON EXISTING CUSTOMERS","Spend $15,000 to strengthen loyalty.","loyalty"]
-  ]
- };
-
- return{
-  headline:"THE BANK DEMANDS A FINAL DECISION!",
-  story:"Your loan is under review. The board must decide the company's future.",
-  question:"HOW DO YOU FINISH?",
-  choices:[
-   ["PAY DOWN DEBT","Use up to $50,000 of cash to repay the bank.","repay"],
-   ["ACCEPT A STRATEGIC INVESTOR","Raise $60,000, sell another 25% of the company.","sell"],
-   ["BET ON A BIG CONTRACT","Spend $25,000 and take a commercial risk.","contract"]
-  ]
- };
+ const r=rounds[step];
+ return {headline:r[0],story:r[1],question:"WHAT IS YOUR DECISION?",choices:r.slice(2)};
 }
-
 function render(){
  const r=getRound();
-
- el("stage").textContent=
-  "CRISIS · DECISION "+(step+1)+"/3";
+ el("stage").textContent="SESSION "+sessionNumber+"/10 · DECISION "+(step+1)+"/30";
  el("headline").textContent=r.headline;
  el("story").textContent=r.story;
  el("question").textContent=r.question;
  el("feedback").textContent="";
-
- const area=el("choices");
- area.replaceChildren();
-
+ const area=el("choices");area.replaceChildren();
  r.choices.forEach(c=>{
   const b=document.createElement("button");
-  const name=document.createElement("strong");
-  name.textContent=c[0];
-
-  const detail=document.createElement("span");
-  detail.textContent=c[1];
-
-  b.append(name,detail);
-  b.onclick=()=>choose(c[2]);
-  area.appendChild(b);
+  const name=document.createElement("strong");name.textContent=c[0];
+  const detail=document.createElement("span");detail.textContent=c[1];
+  b.append(name,detail);b.onclick=()=>choose(c[2],c[0]);area.appendChild(b);
  });
 }
-
-function choose(action){
- if(!active)return;
-
- const s=state;
+function choose(action,label){
+ if(!active||finished)return;
+ if(!sessionTimedOut&&Date.now()>=timerDeadline){
+  clearInterval(interval);remainingSeconds=0;sessionTimedOut=true;
+  applyTimePenalty();tick();
+  el("timeNotice").textContent="TIME EXPIRED. Finish the remaining decisions without a timer.";
+ }
+ const s=state, l=sessionLedger;
+ const before={...s};
  let note="";
-
- if(action==="product"){
-  s.cash-=45000;
-  s.customers+=shock==="boom"?40:12;
-  s.reputation+=6;
-  note="Product development consumed cash.";
- }
-
- if(action==="investor"){
-  s.cash+=75000;
-  s.ownership-=30;
-  note="New capital arrived, but your ownership fell.";
- }
-
- if(action==="cuts"){
-  s.cash+=20000;
-  s.customers-=22;
-  s.reputation-=20;
-  note="Costs fell, but customers lost confidence.";
- }
-
- if(action==="expand"){
-  s.cash-=40000;
-  s.customers+=shock==="boom"?55:8;
-  note="Expansion increased capacity and costs.";
- }
-
- if(action==="renegotiate"){
-  s.cash-=10000;
-  s.debt-=20000;
-  note="The bank agreed to restructure part of the debt.";
- }
-
- if(action==="loyalty"){
-  s.cash-=15000;
-  s.customers+=18;
-  s.reputation+=12;
-  note="Customer retention improved.";
- }
-
- if(action==="repay"){
-  const payment=Math.min(
-   50000,Math.max(0,s.cash)
-  );
-  s.cash-=payment;
-  s.debt-=Math.min(s.debt,payment);
-  note="You repaid "+fmt(payment)+" of bank debt.";
- }
-
- if(action==="sell"){
-  s.cash+=60000;
-  s.ownership-=25;
-  note="You raised funds by selling more shares.";
- }
-
- if(action==="contract"){
-  s.cash-=25000;
-  s.customers+=shock==="boom"?35:5;
-  note="You accepted a risky commercial contract.";
- }
-
- events.push(note);
-
- if(step===0){
-  if(shock==="recession"){
-   s.customers=Math.max(0,s.customers-20);
-   events.push("Recession reduced demand.");
-  }else{
-   s.customers+=20;
-   events.push("Market growth increased demand.");
-  }
- }
-
- if(step===1){
-  const revenue=s.customers*650;
-  const costs=45000;
-  const interest=Math.round(s.debt*0.05);
-  s.cash+=revenue-costs-interest;
-  events.push(
-   "Operating cash flow: "+
-   fmt(revenue-costs-interest)
-  );
- }
-
- if(step===2){
-  const revenue=s.customers*500;
-  const costs=42000;
-  const interest=Math.round(s.debt*0.05);
-  s.cash+=revenue-costs-interest;
-  events.push(
-   "Final cash flow: "+
-   fmt(revenue-costs-interest)
-  );
- }
-
- s.customers=Math.max(0,s.customers);
- s.reputation=Math.max(
-  0,Math.min(100,s.reputation)
- );
-
- update();
-
- if(s.cash<0&&step<2){
-  finish("bankrupt");
-  return;
- }
-
- step++;
-
- if(step>=3){
-  finish("completed");
- }else{
-  render();
- }
+ const spend=n=>{s.cash-=n;l.expenses+=n;};
+ const invest=n=>{s.cash-=n;l.investments+=n;};
+ const earn=n=>{s.cash+=n;l.revenue+=n;};
+ const finance=(n,equity=0)=>{s.cash+=n;l.financing+=n;s.ownership=Math.max(0,s.ownership-equity);};
+ const loan=n=>{s.cash+=n;s.debt+=n;l.financing+=n;l.debtChange+=n;};
+ const repay=n=>{const paid=Math.min(n,Math.max(0,s.cash),s.debt);s.cash-=paid;s.debt-=paid;l.debtChange-=paid;return paid;};
+ const client=(n)=>{s.customers=Math.max(0,s.customers+n);};
+ const rep=(n)=>{s.reputation=Math.max(0,Math.min(100,s.reputation+n));};
+ const goodMarket=shock==="boom";
+ const actions={
+  product:()=>{invest(45000);client(goodMarket?40:12);rep(6);},
+  investor:()=>finance(75000,30), cuts:()=>{earn(20000);client(-22);rep(-20);},
+  expand:()=>{invest(40000);client(goodMarket?55:8);},
+  renegotiate:()=>{spend(10000);s.debt=Math.max(0,s.debt-20000);l.debtChange-=20000;},
+  loyalty:()=>{spend(15000);client(18);rep(12);},
+  repay:()=>repay(50000),sell:()=>finance(60000,25),
+  contract:()=>{spend(25000);client(goodMarket?35:5);},
+  hire:()=>{spend(18000);client(20);rep(8);},contractors:()=>{spend(9000);client(11);rep(3);},freeze:()=>{earn(8000);client(-10);rep(-8);},
+  discount:()=>{client(24);spend(12000);},premium:()=>{spend(16000);rep(13);client(9);},bundle:()=>{spend(7000);client(15);},
+  supplier:()=>{invest(12000);rep(4);},inventory:()=>{invest(22000);client(12);},raiseprices:()=>{earn(14000);client(-12);rep(-5);},
+  export:()=>{invest(30000);client(goodMarket?45:18);},pilot:()=>{spend(12000);client(15);},domestic:()=>{spend(6000);client(10);rep(5);},
+  security:()=>{invest(16000);rep(9);},insurance:()=>{spend(8000);rep(4);},ignorecyber:()=>{rep(-15);client(-8);},
+  refund:()=>{spend(14000);rep(16);client(7);},support:()=>{spend(9000);rep(10);client(9);},deny:()=>{rep(-18);client(-15);},
+  automate:()=>{invest(28000);rep(6);},reprice:()=>{earn(18000);client(-12);},footprint:()=>{earn(16000);rep(-10);client(-6);},
+  exclusive:()=>{earn(32000);client(25);rep(-3);},nonexclusive:()=>{earn(14000);client(14);},direct:()=>{invest(19000);client(20);},
+  payraise:()=>{spend(17000);rep(12);client(6);},bonus:()=>{spend(10000);rep(8);},rejectpay:()=>{rep(-15);client(-9);},
+  borrow:()=>loan(60000),smallborrow:()=>loan(25000),decline:()=>rep(3),
+  viral:()=>{spend(20000);client(goodMarket?55:27);},prepare:()=>{spend(11000);client(25);rep(7);},organic:()=>client(goodMarket?22:9),
+  merge:()=>{finance(50000,15);client(35);},joint:()=>{invest(15000);client(23);},independent:()=>{invest(8000);client(11);rep(5);},
+  efficient:()=>{invest(24000);rep(6);},fixedenergy:()=>spend(10000),energycost:()=>spend(17000),
+  compliance:()=>{spend(14000);rep(10);},advisor:()=>{spend(7000);rep(5);},delayaudit:()=>{spend(21000);rep(-13);},
+  fund:()=>finance(45000,10),convertible:()=>loan(35000),refusefund:()=>rep(3),
+  ai:()=>{invest(21000);client(15);rep(6);},aipilot:()=>{spend(8000);client(7);},noai:()=>client(-5),
+  retain:()=>{spend(13000);client(18);rep(7);},diversify:()=>{invest(18000);client(27);},bluff:()=>{client(-28);rep(-8);},
+  pay35:()=>repay(35000),refinance:()=>{spend(9000);s.debt=Math.max(0,s.debt-10000);l.debtChange-=10000;},waitrates:()=>spend(12000),
+  branch:()=>{invest(38000);client(goodMarket?45:20);},distributor:()=>{spend(14000);client(23);},local:()=>{spend(10000);client(15);},
+  innovate:()=>{invest(25000);client(25);rep(8);},defend:()=>{spend(12000);rep(10);},compete:()=>{spend(15000);client(15);},
+  factor:()=>{loan(25000);spend(3000);},terms:()=>spend(5000),delaypay:()=>{earn(9000);rep(-12);},
+  acquire:()=>{invest(42000);client(38);},stake:()=>{invest(18000);client(14);},walk:()=>rep(2),
+  transparent:()=>{spend(12000);rep(16);},crisis:()=>{spend(19000);rep(20);},silent:()=>{rep(-20);client(-12);},
+  longterm:()=>{spend(11000);client(18);},betterprices:()=>{earn(20000);client(-8);},replace:()=>{invest(20000);client(26);},
+  pay45:()=>repay(45000),issue:()=>finance(40000,10),growth:()=>{invest(23000);client(27);},
+  nationwide:()=>{invest(36000);client(goodMarket?52:25);},optimize:()=>{invest(16000);rep(9);},reserve:()=>rep(4),
+  future:()=>{invest(30000);client(22);rep(10);},finalrepay:()=>repay(50000),finalcustomers:()=>{spend(14000);client(20);rep(12);}
+ };
+ if(!actions[action])return;
+ actions[action]();
+ // Operating activity: each decision advances a period of trading.
+ // Revenue is earned from customers; operating costs and interest are separate.
+ const sales=Math.round(s.customers*(goodMarket?190:145));
+ const operating= Math.round(7000+Math.max(0,s.customers)*32);
+ const interest=Math.round(s.debt*0.008);
+ s.cash+=sales-operating-interest;
+ l.revenue+=sales;l.expenses+=operating;l.interest+=interest;
+ note=label+": "+(s.cash-before.cash>=0?"+":"")+fmt(s.cash-before.cash)+" cash change, "+
+  (s.customers-before.customers>=0?"+":"")+(s.customers-before.customers)+" customers.";
+ sessionNotes.push(note);events.push(note);
+ step++;update();
+ if(step%SESSION_SIZE===0||step>=TOTAL_DECISIONS){
+  pauseTimer();showSessionReport();
+ }else{render();}
+ saveProgress();
 }
-
+function reportLine(label,value){
+ const div=document.createElement("div");div.className="reportLine";
+ const a=document.createElement("span");a.textContent=label;
+ const b=document.createElement("strong");b.textContent=value;
+ div.append(a,b);return div;
+}
+function showSessionReport(){
+ pauseTimer();hideScreens();el("sessionReport").classList.remove("hidden");
+ el("reportStage").textContent="SESSION "+sessionNumber+" OF 10 · "+step+"/30 DECISIONS";
+ const l=sessionLedger,s=state,b=sessionStart;
+ const profit=l.revenue-l.expenses-l.interest;
+ const diff=(a,b)=>{const d=a-b;return (d>0?"+":"")+d;};
+ el("sessionSummary").textContent="Market: "+shock.toUpperCase()+" · "+
+  (sessionTimedOut?"10-second deadline missed · 0.1% time penalty":"All 3 decisions completed within the time limit")+
+  " · Take your time before continuing.";
+ const grid=el("reportMetrics");grid.replaceChildren();
+ const values=[
+  ["CASH",fmt(s.cash),fmt(b.cash)+" → "+fmt(s.cash)],
+  ["SESSION PROFIT / LOSS",fmt(profit),"Operating result (not cash change)"],
+  ["DEBT",fmt(s.debt),fmt(b.debt)+" → "+fmt(s.debt)],
+  ["CUSTOMERS",String(s.customers),diff(s.customers,b.customers)+" this session"],
+  ["REPUTATION",s.reputation+"/100",diff(s.reputation,b.reputation)+" points"],
+  ["FOUNDER OWNERSHIP",pct(s.ownership),pct(b.ownership)+" → "+pct(s.ownership)],
+  ["VECORIQ HOLDINGS",pct(currentChallenge?0:cumulativePenalties),"Time penalties, cumulative"],
+  ["OTHER INVESTORS",pct(Math.max(0,100-s.ownership-(currentChallenge?0:cumulativePenalties))),"Equity sold to investors"]
+ ];
+ values.forEach(v=>{
+  const div=document.createElement("div");div.className="metric";
+  const a=document.createElement("div");a.className="label";a.textContent=v[0];
+  const n=document.createElement("div");n.className="number";n.textContent=v[1];
+  const d=document.createElement("div");d.className="label";d.textContent=v[2];
+  div.append(a,n,d);grid.appendChild(div);
+ });
+ const income=el("incomeDetails");income.replaceChildren();
+ [["Sales and other operating revenue",fmt(l.revenue)],
+ ["Operating costs and decision expenses",fmt(l.expenses)],
+ ["Interest paid",fmt(l.interest)],
+ ["SESSION PROFIT / LOSS",fmt(profit)],
+ ["New financing received",fmt(l.financing)],
+ ["Investments made",fmt(l.investments)],
+ ["Change in debt",(l.debtChange>=0?"+":"")+fmt(l.debtChange)],
+ ["NET CHANGE IN CASH",(s.cash-b.cash>=0?"+":"")+fmt(s.cash-b.cash)]
+ ].forEach(v=>income.appendChild(reportLine(v[0],v[1])));
+ const decisions=el("decisionDetails");decisions.replaceChildren();
+ sessionNotes.forEach((n,i)=>{const p=document.createElement("p");p.textContent=(i+1)+". "+n;decisions.appendChild(p);});
+ const risks=[];
+ if(s.cash<0)risks.push("NEGATIVE CASH: urgent refinancing or new revenue may be needed.");
+ if(s.customers<25)risks.push("LOW CUSTOMER BASE: demand is dangerously weak.");
+ if(s.reputation<35)risks.push("REPUTATION CRISIS: rebuilding trust is essential.");
+ if(s.debt>Math.max(1,s.cash)*3)risks.push("HIGH DEBT: financial pressure remains severe.");
+ el("sessionWarning").textContent=risks.length?risks.join(" "):"Your company is still operating. Review the results before the next session.";
+ el("continueButton").textContent=step>=TOTAL_DECISIONS?"VIEW FINAL 30-DECISION RESULT":"CONTINUE - NEXT 10 SECONDS";
+ saveProgress();
+}
+function continueSession(){
+ if(step>=TOTAL_DECISIONS){finish("completed");return;}
+ beginSession();
+}
 function rescueVerdict(before,after){
  const yourScore=challengeScore(after);
  const targetScore=challengeScore(before);
@@ -889,6 +1026,7 @@ function rescueVerdict(before,after){
 function finish(reason){
  if(!active)return;
 
+ if(!currentChallenge)clearSavedProgress();
  active=false;
  clearInterval(interval);
 
@@ -1054,8 +1192,9 @@ function showRescueReport(data){
  el("challengeIntro").classList.add("hidden");
  el("companyIntro").classList.add("hidden");
  el("rescueReport").classList.remove("hidden");
+  el("sessionReport").classList.add("hidden");
 
- el("timer").textContent="60s";
+ el("timer").textContent="10s";
  el("bar").style.width="100%";
  el("timeNotice").textContent="";
 
@@ -1282,7 +1421,8 @@ if(incomingReport){
  }else if(!companyName){
   showCompanyIntro();
  }else{
-  startGame();
+  const saved=loadProgress();
+  if(saved)restoreProgress(saved);else startGame();
  }
 }
 </script>
