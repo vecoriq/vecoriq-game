@@ -4,7 +4,20 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>VECORIQ - The Virtual Economy</title>
+<title>VECORIQ. - The Virtual Economy</title>
+<meta name="theme-color" content="#071727">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Build a virtual company. Make 30 economic decisions, study financial reports and challenge friends to rescue your business.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="VECORIQ. - The Virtual Economy">
+<meta property="og:description" content="30 economic decisions. 10 sessions. Can you build and save your company?">
+<meta property="og:url" content="https://vecoriq.github.io/vecoriq-game/">
+<meta property="og:image" content="https://vecoriq.github.io/vecoriq-game/share-preview.png">
+<meta name="twitter:card" content="summary_large_image">
+
 <style>
 *{box-sizing:border-box}
 body{margin:0;background:#081525;color:white;font-family:Arial,sans-serif}
@@ -88,7 +101,7 @@ button span{font-size:11px}.shareGrid{gap:5px}
 <main>
 
 <header>
-<div class="logo">VECORIQ</div>
+<div class="logo">VECORIQ<span style="color:#F4B544">.</span></div>
 <div class="timer" id="timer">10s</div>
 </header>
 <div class="track"><div id="bar"></div></div>
@@ -1425,6 +1438,9 @@ if(incomingReport){
   if(saved)restoreProgress(saved);else startGame();
  }
 }
+</script>
+<script>
+if ('serviceWorker' in navigator) { window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch(() => {})); }
 </script>
 </body>
 </html>
