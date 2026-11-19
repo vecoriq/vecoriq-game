@@ -236,6 +236,7 @@ PLAY VECORIQ - FREE
 <h2 id="resultCash"></h2>
 <p id="resultDetails"></p>
 <p id="resultHoldings"></p>
+<div id="historyPanel" class="panel" style="text-align:left;display:none"><h2>COMPANY SIMULATION HISTORY</h2><p class="muted">Saved on this device only. Replays start with fresh conditions.</p><div id="historyEntries"></div></div>
 <p id="challengeResult"></p>
 
 <div id="rescueActions" class="hidden">
@@ -319,11 +320,12 @@ const companyKey="vecoriq_company_name_v1";
 const challengeVersion=1;
 const reportVersion=1;
 const progressKey="vecoriq_business_progress_v2";
+const historyKey="vecoriq_simulation_history_v3";
 const TOTAL_DECISIONS=30;
 const SESSION_SIZE=3;
 
 let state,step,seconds,interval,active,shock,events,penalized;
-let cumulativePenalties=readPenalties();
+let cumulativePenalties=0; // v3: time penalties belong to one simulation only
 let companyName=readCompanyName();
 let incomingChallenge=null;
 let currentChallenge=null;
@@ -344,11 +346,7 @@ function readPenalties(){
  }catch(e){return 0;}
 }
 
-function savePenalties(){
- try{
-  localStorage.setItem(ledgerKey,String(cumulativePenalties));
- }catch(e){}
-}
+function savePenalties(){ /* v3: never persist time penalties between simulations */ }
 
 function cleanCompanyName(name){
  return String(name||"")
@@ -633,7 +631,7 @@ function saveProgress(){
    sessionStart,sessionLedger,sessionNotes,sessionNumber,events,
    phase:el("sessionReport").classList.contains("hidden")?"playing":"report",
    remainingSeconds:Math.max(0,Math.ceil((timerDeadline-Date.now())/1000)),
-   sessionTimedOut,penalized}));
+   timerDeadline,cumulativePenalties,sessionTimedOut,penalized}));
  }catch(e){}
 }
 function loadProgress(){
@@ -656,13 +654,17 @@ function restoreProgress(d){
  sessionNumber=d.sessionNumber||Math.floor(step/3)+1;
  events=Array.isArray(d.events)?d.events:[];
  penalized=!!d.penalized;sessionTimedOut=!!d.sessionTimedOut;
+ cumulativePenalties=Number.isFinite(d.cumulativePenalties)?Math.max(0,Math.min(100,d.cumulativePenalties)):
+  Math.max(0,Math.round((100-Number(state.ownership||100))*10)/10);
  active=true;finished=false;
  el("gameCompanyName").textContent="COMPANY: "+companyName;
  hideScreens();update();updateOwnership();
  if(d.phase==="report"){
   showSessionReport();
  }else{
-  timerDeadline=Number.isFinite(d.timerDeadline)?d.timerDeadline:0;
+  // Legacy v2 saves have remainingSeconds but no timerDeadline.
+  timerDeadline=Number.isFinite(d.timerDeadline)&&d.timerDeadline>0?
+   d.timerDeadline:Date.now()+Math.max(0,Number(d.remainingSeconds)||0)*1000;
   remainingSeconds=Math.max(0,Math.ceil((timerDeadline-Date.now())/1000));
   if(!sessionTimedOut&&remainingSeconds<=0){applyTimePenalty();sessionTimedOut=true;}
   if(!sessionTimedOut&&remainingSeconds>0){
@@ -691,9 +693,9 @@ function emptyLedger(){return {revenue:0,expenses:0,interest:0,financing:0,inves
 function startGame(challenge=null){
  clearInterval(interval);
  currentChallenge=challenge;finalOutcome=null;finished=false;
- if(!challenge)clearSavedProgress();
+ if(!challenge){clearSavedProgress();cumulativePenalties=0;}
  state={cash:70000,debt:90000,customers:60,reputation:65,
-  ownership:challenge?100:Math.max(0,100-cumulativePenalties)};
+  ownership:100};
  step=0;active=true;events=[];
  shock=challenge?challenge.market:(Math.random()<0.5?"recession":"boom");
  el("gameCompanyName").textContent=(challenge?"RESCUING: ":"COMPANY: ")+effectiveCompanyName();
@@ -1036,6 +1038,29 @@ function rescueVerdict(before,after){
  return "CHALLENGE LOST! The original result was better.";
 }
 
+function readHistory(){
+ try{const h=JSON.parse(localStorage.getItem(historyKey)||"[]");return Array.isArray(h)?h:[];}
+ catch(e){return [];}
+}
+function archiveOutcome(record){
+ try{const h=readHistory();h.unshift(record);localStorage.setItem(historyKey,JSON.stringify(h.slice(0,100)));}
+ catch(e){}
+}
+function renderHistory(name){
+ const panel=el("historyPanel"),target=el("historyEntries");
+ if(!panel||!target)return;
+ const records=readHistory().filter(r=>r.companyName===name);
+ panel.style.display=records.length?"block":"none";
+ target.replaceChildren();
+ records.slice(0,10).forEach((r,i)=>{
+  const line=document.createElement("p");
+  line.textContent=(i+1)+". "+new Date(r.date).toLocaleString()+" | "+
+   (r.failed?"Collapsed":"Completed")+" | Cash "+fmt(r.cash)+
+   " | Debt "+fmt(r.debt)+" | Customers "+r.customers+
+   " | Founder "+pct(r.ownership)+" | "+r.market;
+  target.appendChild(line);
+ });
+}
 function finish(reason){
  if(!active)return;
 
@@ -1079,6 +1104,13 @@ function finish(reason){
   companyName:playedCompany
  };
 
+ if(!currentChallenge){
+  archiveOutcome({date:new Date().toISOString(),companyName:playedCompany,
+   cash:Math.round(s.cash),debt:Math.round(s.debt),customers:s.customers,
+   reputation:s.reputation,ownership:s.ownership,market:shock,
+   failed,decisions:step,reason,penalties:cumulativePenalties});
+ }
+ renderHistory(currentChallenge?"":playedCompany);
  el("game").classList.add("hidden");
  el("ending").classList.remove("hidden");
 

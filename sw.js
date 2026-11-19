@@ -1,5 +1,5 @@
 // VECORIQ. app shell. Network-first for HTML so updates are not trapped in cache.
-const CACHE = 'vecoriq-shell-v2';
+const CACHE = 'vecoriq-shell-v3';
 const ASSETS = ['./manifest.json','./icon-192.png','./icon-512.png'];
 self.addEventListener('install', event => { event.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS))); self.skipWaiting(); });
 self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))); self.clients.claim(); });
