@@ -105,8 +105,17 @@ button span{font-size:11px}.shareGrid{gap:5px}
 <div class="timer" id="timer">10s</div>
 </header>
 <div class="track"><div id="bar"></div></div>
+<div style="text-align:right"><button class="smallButton" onclick="showMyCompanies()">MY COMPANIES</button></div>
 <p id="timeNotice" role="status" aria-live="polite"></p>
 
+<section id="companiesPanel" class="panel hidden">
+<div class="tag">VECORIQ v4 LOCAL TEST</div>
+<h1>MY COMPANIES</h1>
+<p class="muted">Your companies and progress are stored on this device. No payments or online accounts in this test build.</p>
+<div id="companiesEntries"></div>
+<button class="primary" onclick="createAnotherCompany()">+ ADD TEST COMPANY</button>
+<p class="notice">Test companies are free in this preview. Future paid-company rules are not active.</p>
+</section>
 <section id="companyIntro" class="panel hidden">
 <div class="tag">WELCOME TO VECORIQ</div>
 <h1>NAME YOUR COMPANY</h1>
@@ -273,13 +282,13 @@ RETRY COMPANY RESCUE
 </button>
 </div>
 
-<button class="primary" onclick="playFresh()">
-PLAY MY OWN COMPANY
+<button class="primary" onclick="showMyCompanies()">
+MY COMPANIES
 </button>
 
 <button id="renameButton" class="smallButton"
- onclick="renameCompany()">
-CHANGE COMPANY NAME
+ onclick="showMyCompanies()">
+MY COMPANIES
 </button>
 
 <h2 class="shareTitle">SAVE MY COMPANY - INVITE FRIENDS</h2>
@@ -321,6 +330,55 @@ const challengeVersion=1;
 const reportVersion=1;
 const progressKey="vecoriq_business_progress_v2";
 const historyKey="vecoriq_simulation_history_v3";
+const companiesKey="vecoriq_companies_v4";
+const legacyProgressKey=progressKey;
+let selectedCompanyId="";
+function readCompanies(){
+ try {const x=JSON.parse(localStorage.getItem(companiesKey)||"[]");return Array.isArray(x)?x.filter(v=>v&&typeof v.id==="string"&&typeof v.name==="string"):[];}
+ catch(e){return [];}
+}
+function saveCompanies(list){try{localStorage.setItem(companiesKey,JSON.stringify(list));}catch(e){}}
+function makeCompanyId(){return "c"+Date.now().toString(36)+Math.random().toString(36).slice(2,10);}
+function initializeCompanies(){
+ let list=readCompanies();
+ if(!list.length && companyName){
+  const id=makeCompanyId();list=[{id,name:companyName,created:new Date().toISOString()}];saveCompanies(list);
+  try{const old=localStorage.getItem(legacyProgressKey);if(old)localStorage.setItem(progressKeyFor(id),old);}catch(e){}
+ }
+ if(list.length){
+  const preferred=list.find(c=>c.name===companyName)||list[0];
+  selectedCompanyId=preferred.id;companyName=preferred.name;storeCompanyName(companyName);
+ }
+}
+function progressKeyFor(id){return "vecoriq_business_progress_v4_"+id;}
+function selectCompany(id){
+ const c=readCompanies().find(x=>x.id===id);if(!c)return;
+ clearInterval(interval);active=false;selectedCompanyId=c.id;companyName=c.name;storeCompanyName(c.name);
+ hideScreens();const saved=loadProgress();if(saved)restoreProgress(saved);else startGame();
+}
+function showMyCompanies(){
+ clearInterval(interval);if(active&&!currentChallenge)saveProgress();active=false;
+ incomingChallenge=null;currentChallenge=null;clearSpecialURL();hideScreens();
+ el("companiesPanel").classList.remove("hidden");
+ const target=el("companiesEntries");target.replaceChildren();
+ readCompanies().forEach(c=>{
+  const box=document.createElement("div");box.className="panel";
+  const label=document.createElement("strong");label.textContent=c.name;
+  const note=document.createElement("p");note.className="muted";
+  note.textContent=localStorage.getItem(progressKeyFor(c.id))?"Simulation in progress":"Ready for a new simulation";
+  const button=document.createElement("button");button.className="primary";
+  button.textContent="OPEN COMPANY";button.addEventListener("click",()=>selectCompany(c.id));
+  box.append(label,note,button);target.appendChild(box);
+ });
+}
+function createAnotherCompany(){
+ const list=readCompanies();
+ const name=cleanCompanyName(prompt("Name your test company:"));
+ if(!name)return;
+ if(list.some(c=>c.name.toLowerCase()===name.toLowerCase())){alert("That company already exists.");return;}
+ const id=makeCompanyId();list.push({id,name,created:new Date().toISOString()});saveCompanies(list);selectCompany(id);
+}
+
 const TOTAL_DECISIONS=30;
 const SESSION_SIZE=3;
 
@@ -405,6 +463,11 @@ function saveCompanyAndStart(){
   return;
  }
 
+ const list=readCompanies();
+ const existing=list.find(c=>c.name.toLowerCase()===name.toLowerCase());
+ if(existing){selectedCompanyId=existing.id;}else{
+  selectedCompanyId=makeCompanyId();list.push({id:selectedCompanyId,name,created:new Date().toISOString()});saveCompanies(list);
+ }
  companyName=name;
  storeCompanyName(name);
  el("companyIntro").classList.add("hidden");
@@ -415,12 +478,7 @@ el("companyNameInput").addEventListener("keydown",function(e){
  if(e.key==="Enter")saveCompanyAndStart();
 });
 
-function renameCompany(){
- incomingChallenge=null;
- currentChallenge=null;
- clearSpecialURL();
- showCompanyIntro();
-}
+function renameCompany(){showMyCompanies();}
 
 function updateOwnership(){
  if(currentChallenge){
@@ -622,12 +680,12 @@ function playFresh(){
 }
 
 function clearSavedProgress(){
- try{localStorage.removeItem(progressKey);}catch(e){}
+ try{localStorage.removeItem(selectedCompanyId?progressKeyFor(selectedCompanyId):legacyProgressKey);}catch(e){}
 }
 function saveProgress(){
  if(currentChallenge||!active)return;
  try{
-  localStorage.setItem(progressKey,JSON.stringify({v:2,companyName,state,step,shock,
+  localStorage.setItem(selectedCompanyId?progressKeyFor(selectedCompanyId):legacyProgressKey,JSON.stringify({v:2,companyName,state,step,shock,
    sessionStart,sessionLedger,sessionNotes,sessionNumber,events,
    phase:el("sessionReport").classList.contains("hidden")?"playing":"report",
    remainingSeconds:Math.max(0,Math.ceil((timerDeadline-Date.now())/1000)),
@@ -636,7 +694,7 @@ function saveProgress(){
 }
 function loadProgress(){
  try{
-  const d=JSON.parse(localStorage.getItem(progressKey)||"null");
+  const d=JSON.parse(localStorage.getItem(selectedCompanyId?progressKeyFor(selectedCompanyId):legacyProgressKey)||"null");
   if(!d||d.v!==2||d.companyName!==companyName||!d.state||
    !Number.isInteger(d.step)||d.step<0||d.step>TOTAL_DECISIONS||
     (d.step===TOTAL_DECISIONS&&d.phase!=="report")||
@@ -687,7 +745,7 @@ function restoreProgress(d){
  }
 }
 function hideScreens(){
- ["game","ending","challengeIntro","companyIntro","rescueReport","sessionReport"].forEach(id=>el(id).classList.add("hidden"));
+ ["game","ending","challengeIntro","companyIntro","companiesPanel","rescueReport","sessionReport"].forEach(id=>el(id).classList.add("hidden"));
 }
 function emptyLedger(){return {revenue:0,expenses:0,interest:0,financing:0,investments:0,debtChange:0};}
 function startGame(challenge=null){
@@ -1456,6 +1514,7 @@ async function copyRescueReport(){
 
 const incomingReport=readIncomingReport();
 
+initializeCompanies();
 if(incomingReport){
  showRescueReport(incomingReport);
 }else{
@@ -1466,8 +1525,7 @@ if(incomingReport){
  }else if(!companyName){
   showCompanyIntro();
  }else{
-  const saved=loadProgress();
-  if(saved)restoreProgress(saved);else startGame();
+  showMyCompanies();
  }
 }
 </script>
